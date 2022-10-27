@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.configurationprocessor.json.JSONObject;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -28,9 +30,9 @@ public class UserMessageController {
      *
      * @return API response json
      */
-    @GetMapping(value = "/user/message")
-    Object userMessage(Map<String, Object> params) {
-        logger.info("/user/message get request" + JSON.toJSONString(params));
+    @PostMapping(value = "/user/message")
+    Object userMessage(@RequestBody Map<String, Object> request) {
+        logger.info("/user/message get request" + JSON.toJSONString(request));
 
         return "";
     }
