@@ -1,5 +1,6 @@
 package com.tencent.wxcloudrun.controller;
 
+import com.alibaba.fastjson2.JSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.configurationprocessor.json.JSONObject;
@@ -29,7 +30,7 @@ public class UserMessageController {
      */
     @GetMapping(value = "/user/message")
     Object userMessage(Map<String, Object> params) {
-        logger.info("/user/message get request" + new JSONObject(params));
+        logger.info("/user/message get request" + JSON.toJSONString(params));
 
         return "";
     }
