@@ -32,7 +32,14 @@ public class UserMessageController {
      */
     @PostMapping(value = "/user/message")
     Object userMessage(@RequestBody Map<String, Object> request) {
-        logger.info("/user/message get request" + JSON.toJSONString(request));
+        logger.info("/user/message post request " + JSON.toJSONString(request));
+
+        return "";
+    }
+
+    @GetMapping(value = "/pdd")
+    Object pdd(Map<String, Object> request) {
+        logger.info("/pdd get request " + JSON.toJSONString(request));
 
         return "";
     }
