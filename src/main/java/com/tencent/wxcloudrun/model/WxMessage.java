@@ -8,30 +8,30 @@ import java.util.List;
 
 @Data
 public class WxMessage {
-    @Alias("ToUserName")
+    @JsonProperty("ToUserName")
     private String toUserName;
-    @Alias("FromUserName")
+    @JsonProperty("FromUserName")
     private String fromUserName;
-    @Alias("CreateTime")
+    @JsonProperty("CreateTime")
     private String createTime;
-    @Alias("MsgType")
+    @JsonProperty("MsgType")
     private String msgType;
-    @Alias("ArticleCount")
+    @JsonProperty("ArticleCount")
     private Integer articleCount;
-    @Alias("Articles")
+    @JsonProperty("Articles")
     private List<Articles> articles;
-    @Alias("Content")
+    @JsonProperty("Content")
     private String content;
 
     @Data
     public static class Articles {
-        @Alias("Title")
+        @JsonProperty("Title")
         private String title;
-        @Alias("Description")
+        @JsonProperty("Description")
         private String description;
-        @Alias("PicUrl")
+        @JsonProperty("PicUrl")
         private String picUrl;
-        @Alias("Url")
+        @JsonProperty("Url")
         private String url;
     }
 }

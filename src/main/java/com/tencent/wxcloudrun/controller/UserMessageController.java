@@ -69,7 +69,7 @@ public class UserMessageController {
                 //同步调用
                 PddDdkGoodsSearchResponse pddDdkGoodsSearchResponse = getClient().syncInvoke(pddDdkGoodsSearchRequest);
                 if (StrUtil.equals(env, "dev")) {
-                    logger.info("Method:[{}],Request:{},Response:{}", "PddDdkGoodsSearch", JsonUtil.transferToJson(pddDdkGoodsSearchRequest), JSONUtil.toJsonStr(pddDdkGoodsSearchResponse));
+                    logger.info("Method:[{}],Request:{},Response:{}", "PddDdkGoodsSearch", JsonUtil.transferToJson(pddDdkGoodsSearchRequest), JsonUtil.transferToJson(pddDdkGoodsSearchResponse));
                 }
                 if (pddDdkGoodsSearchResponse.getGoodsSearchResponse().getGoodsList() != null && pddDdkGoodsSearchResponse.getGoodsSearchResponse().getGoodsList().size() > 0) {
                     PddDdkGoodsSearchResponse.GoodsSearchResponseGoodsListItem goodsListItem = pddDdkGoodsSearchResponse.getGoodsSearchResponse().getGoodsList().get(0);
@@ -80,7 +80,7 @@ public class UserMessageController {
                     pddDdkGoodsPromotionUrlGenerateRequest.setSearchId(goodsListItem.getSearchId());
                     PddDdkGoodsPromotionUrlGenerateResponse pddDdkGoodsPromotionUrlGenerateResponse = getClient().syncInvoke(pddDdkGoodsPromotionUrlGenerateRequest);
                     if (StrUtil.equals(env, "dev")) {
-                        logger.info("Method:[{}],Request:{},Response:{}", "PddDdkGoodsPromotionUrlGenerate", JsonUtil.transferToJson(pddDdkGoodsPromotionUrlGenerateRequest), JSONUtil.toJsonStr(pddDdkGoodsPromotionUrlGenerateResponse));
+                        logger.info("Method:[{}],Request:{},Response:{}", "PddDdkGoodsPromotionUrlGenerate", JsonUtil.transferToJson(pddDdkGoodsPromotionUrlGenerateRequest), JsonUtil.transferToJson(pddDdkGoodsPromotionUrlGenerateResponse));
                     }
                     if (pddDdkGoodsPromotionUrlGenerateResponse.getGoodsPromotionUrlGenerateResponse() != null &&
                             pddDdkGoodsPromotionUrlGenerateResponse.getGoodsPromotionUrlGenerateResponse().getGoodsPromotionUrlList() != null &&
@@ -92,27 +92,21 @@ public class UserMessageController {
                         wxMessage.setFromUserName(request.getToUserName());
                         wxMessage.setToUserName(request.getFromUserName());
                         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-//                        wxMessage.setMsgType("news");
-//                        wxMessage.setArticleCount(1);
-//                        List<WxMessage.Articles> articlesList = new ArrayList<>();
-//                        WxMessage.Articles articles = new WxMessage.Articles();
-//                        articles.setTitle(goodsListItem.getGoodsName());
-//                        articles.setPicUrl(goodsListItem.getGoodsThumbnailUrl());
-//                        articles.setUrl(urlListItem.getMobileUrl());
-//                        articlesList.add(articles);
-//                        wxMessage.setArticles(articlesList);
+                        wxMessage.setMsgType("news");
+                        wxMessage.setArticleCount(1);
+                        List<WxMessage.Articles> articlesList = new ArrayList<>();
+                        WxMessage.Articles articles = new WxMessage.Articles();
+                        articles.setTitle(goodsListItem.getGoodsName());
+                        articles.setPicUrl(goodsListItem.getGoodsThumbnailUrl());
+                        articles.setUrl(urlListItem.getMobileUrl());
+                        articlesList.add(articles);
+                        wxMessage.setArticles(articlesList);
 
-                        wxMessage.setMsgType("text");
-                        wxMessage.setContent(urlListItem.getMobileUrl());
+//                        wxMessage.setMsgType("text");
+//                        wxMessage.setContent(urlListItem.getMobileUrl());
 
 
-                        return "<xml>" +
-                                "<ToUserName><![CDATA["+wxMessage.getToUserName()+"]]></ToUserName>" +
-                                "<FromUserName><![CDATA["+wxMessage.getFromUserName()+"]]></FromUserName>" +
-                                "<CreateTime>"+wxMessage.getCreateTime()+"</CreateTime>" +
-                                "<MsgType><![CDATA[text]]></MsgType>" +
-                                "<Content><![CDATA[你好]]></Content>" +
-                                "</xml>";
+                        return wxMessage;
                     } else {
 
                     }
@@ -145,7 +139,7 @@ public class UserMessageController {
             //同步调用
             PddDdkRpPromUrlGenerateResponse response = getClient().syncInvoke(pddDdkGoodsPidGenerateRequest);
             if (StrUtil.equals(env, "dev")) {
-                logger.info("Method:[{}],Request:{},Response:{}", "PddDdkRpPromUrlGenerate", JsonUtil.transferToJson(pddDdkGoodsPidGenerateRequest), JSONUtil.toJsonStr(response));
+                logger.info("Method:[{}],Request:{},Response:{}", "PddDdkRpPromUrlGenerate", JsonUtil.transferToJson(pddDdkGoodsPidGenerateRequest), JsonUtil.transferToJson(response));
             }
             return CommonResult.success(response);
         } catch (Exception e) {
