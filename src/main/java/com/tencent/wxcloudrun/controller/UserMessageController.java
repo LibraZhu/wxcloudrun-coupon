@@ -104,7 +104,15 @@ public class UserMessageController {
 
                         wxMessage.setMsgType("text");
                         wxMessage.setContent(urlListItem.getMobileUrl());
-                        return wxMessage;
+
+
+                        return "<xml>" +
+                                "<ToUserName><![CDATA["+wxMessage.getToUserName()+"]]></ToUserName>" +
+                                "<FromUserName><![CDATA["+wxMessage.getFromUserName()+"]]></FromUserName>" +
+                                "<CreateTime>"+wxMessage.getCreateTime()+"</CreateTime>" +
+                                "<MsgType><![CDATA[text]]></MsgType>" +
+                                "<Content><![CDATA[你好]]></Content>" +
+                                "</xml>";
                     } else {
 
                     }
