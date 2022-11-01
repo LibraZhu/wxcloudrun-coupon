@@ -92,15 +92,18 @@ public class UserMessageController {
                         wxMessage.setFromUserName(request.getToUserName());
                         wxMessage.setToUserName(request.getFromUserName());
                         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-                        wxMessage.setMsgType("news");
-                        wxMessage.setArticleCount(1);
-                        List<WxMessage.Articles> articlesList = new ArrayList<>();
-                        WxMessage.Articles articles = new WxMessage.Articles();
-                        articles.setTitle(goodsListItem.getGoodsName());
-                        articles.setPicUrl(goodsListItem.getGoodsThumbnailUrl());
-                        articles.setUrl(urlListItem.getMobileUrl());
-                        articlesList.add(articles);
-                        wxMessage.setArticles(articlesList);
+//                        wxMessage.setMsgType("news");
+//                        wxMessage.setArticleCount(1);
+//                        List<WxMessage.Articles> articlesList = new ArrayList<>();
+//                        WxMessage.Articles articles = new WxMessage.Articles();
+//                        articles.setTitle(goodsListItem.getGoodsName());
+//                        articles.setPicUrl(goodsListItem.getGoodsThumbnailUrl());
+//                        articles.setUrl(urlListItem.getMobileUrl());
+//                        articlesList.add(articles);
+//                        wxMessage.setArticles(articlesList);
+
+                        wxMessage.setMsgType("text");
+                        wxMessage.setContent(urlListItem.getMobileUrl());
                         return wxMessage;
                     } else {
 

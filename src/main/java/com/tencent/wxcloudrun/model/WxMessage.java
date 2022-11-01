@@ -1,6 +1,7 @@
 package com.tencent.wxcloudrun.model;
 
 import cn.hutool.core.annotation.Alias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
@@ -19,6 +20,8 @@ public class WxMessage {
     private Integer articleCount;
     @Alias("Articles")
     private List<Articles> articles;
+    @Alias("Content")
+    private String content;
 
     @Data
     public static class Articles {
