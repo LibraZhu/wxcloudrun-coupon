@@ -1,7 +1,6 @@
 server:
   port: 80
 
-
 spring:
   profiles:
     active: prop
@@ -17,3 +16,21 @@ spring:
 
 mybatis:
   mapper-locations: classpath*:mapper/*Mapper.xml
+
+client:
+  clientId: 5ffc31b3d3ef472faaa23ed35081a998
+  clientSecret: 940114100d31bff5ab16b4bbb19ec2ad89b78693
+  pid: "35772384_257791152"
+
+taobao:
+  url: https://eco.taobao.com/router/rest
+  appKey: 34166008
+  appSecret: 505774d570ac6116cfca3f1f94cc7d5c
+  pid: 114599450120
+
+jd:
+  serverUrl: https://api.jd.com/routerjson
+  appKey: fd07e7373553e152016b787fba46c182
+  appSecret: eaf58fbf234c406186632d3dcf17771a
+  positionId: 3100085830
+  pid: "2031307306_4100960469_3100085830"

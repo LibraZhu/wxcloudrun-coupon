@@ -92,12 +92,41 @@
             <artifactId>swagger-annotations</artifactId>
             <version>${swagger-annotations.version}</version>
         </dependency>
+
+        <!--拼多多-->
         <dependency>
             <groupId>com.pdd</groupId>
             <artifactId>pop-sdk-1.14.70-all</artifactId>
             <version>1.14.70</version>
             <scope>system</scope>
             <systemPath>${project.basedir}/src/main/resources/lib/pop-sdk-1.14.70-all.jar</systemPath>
+        </dependency>
+        <!--taobao-->
+        <dependency>
+            <groupId>com.taobao</groupId>
+            <artifactId>taobao-sdk</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/src/main/resources/lib/taobao-sdk-java-auto_1564558773427-20220917.jar</systemPath>
+        </dependency>
+
+        <!--京东-->
+        <dependency>
+            <groupId>com.jd</groupId>
+            <artifactId>open-api-sdk-2.0</artifactId>
+            <version>2.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/src/main/resources/lib/open-api-sdk-2.0-2022-10-21.jar</systemPath>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-mapper-asl</artifactId>
+            <version>1.9.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.codehaus.jackson</groupId>
+            <artifactId>jackson-core-asl</artifactId>
+            <version>1.9.2</version>
         </dependency>
 
         <dependency>
