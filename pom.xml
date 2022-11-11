@@ -107,7 +107,7 @@
             <artifactId>taobao-sdk</artifactId>
             <version>1.0</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/src/main/resources/lib/taobao-sdk-java-auto_1564558773427-20220917.jar</systemPath>
+            <systemPath>${project.basedir}/src/main/resources/lib/taobao-sdk-java-auto_1623488203556-20220913.jar</systemPath>
         </dependency>
 
         <!--京东-->

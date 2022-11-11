@@ -22,7 +22,9 @@ import com.taobao.api.ApiException;
 import com.taobao.api.DefaultTaobaoClient;
 import com.taobao.api.TaobaoClient;
 import com.taobao.api.request.TbkDgMaterialOptionalRequest;
+import com.taobao.api.request.TbkSpreadGetRequest;
 import com.taobao.api.response.TbkDgMaterialOptionalResponse;
+import com.taobao.api.response.TbkSpreadGetResponse;
 import com.tencent.wxcloudrun.config.properties.ClientProperties;
 import com.tencent.wxcloudrun.config.properties.JDProperties;
 import com.tencent.wxcloudrun.config.properties.TaobaoProperties;
@@ -148,7 +150,6 @@ public class UserServiceImpl implements UserService {
     private Object taobaoMessage(WxMessageRequest request) {
         try {
             TaobaoClient client = getTaobaoClient();
-            String content = request.getContent();
             TbkDgMaterialOptionalRequest req = new TbkDgMaterialOptionalRequest();
             req.setAdzoneId(taobaoProperties.getPid());
             req.setQ(request.getContent());
@@ -180,9 +181,22 @@ public class UserServiceImpl implements UserService {
                 }
                 articles.setPicUrl(data.getPictUrl());
                 articles.setUrl(data.getUrl().startsWith("//") ? ("https:" + data.getUrl()) : data.getUrl());
+                TbkSpreadGetRequest spreadGetRequest = new TbkSpreadGetRequest();
+                List<TbkSpreadGetRequest.TbkSpreadRequest> list2 = new ArrayList<TbkSpreadGetRequest.TbkSpreadRequest>();
+                TbkSpreadGetRequest.TbkSpreadRequest obj3 = new TbkSpreadGetRequest.TbkSpreadRequest();
+                list2.add(obj3);
+                obj3.setUrl(articles.getUrl());
+                spreadGetRequest.setRequests(list2);
+                TbkSpreadGetResponse spreadGetResponse = client.execute(spreadGetRequest);
+                if (spreadGetResponse.getResults()!=null&&spreadGetResponse.getResults().size()>0){
+                    TbkSpreadGetResponse.TbkSpread spread = spreadGetResponse.getResults().get(0);
+                    if (StrUtil.equals(env, "dev")) {
+                        logger.info("Method:[{}],Request:{},Response:{}", "Taobao Spread", JsonUtil.transferToJson(spreadGetRequest), JsonUtil.transferToJson(spreadGetResponse));
+                    }
+                    articles.setUrl(spread.getContent());
+                }
                 articlesList.add(articles);
                 wxMessage.setArticles(articlesList);
-
 //                RestTemplate restTemplate = new RestTemplate();
 //                String url = "http://api.weixin.qq.com/cgi-bin/message/custom/send";
 //                WxSendMessage wxSendMessage = new WxSendMessage();
