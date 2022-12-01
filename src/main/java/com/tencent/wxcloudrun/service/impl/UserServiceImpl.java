@@ -25,23 +25,31 @@ import com.taobao.api.request.TbkDgMaterialOptionalRequest;
 import com.taobao.api.request.TbkSpreadGetRequest;
 import com.taobao.api.response.TbkDgMaterialOptionalResponse;
 import com.taobao.api.response.TbkSpreadGetResponse;
+import com.tencent.wxcloudrun.common.api.CommonResult;
 import com.tencent.wxcloudrun.config.properties.ClientProperties;
 import com.tencent.wxcloudrun.config.properties.JDProperties;
 import com.tencent.wxcloudrun.config.properties.TaobaoProperties;
+import com.tencent.wxcloudrun.dto.WxMenuRequest;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
+import com.tencent.wxcloudrun.dto.WxResponse;
 import com.tencent.wxcloudrun.model.WxMessage;
+import com.tencent.wxcloudrun.model.WxSendMessage;
 import com.tencent.wxcloudrun.service.UserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -59,12 +67,56 @@ public class UserServiceImpl implements UserService {
     private String env;
 
     @Override
+    public CommonResult userCreateMenu(WxMenuRequest request) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "http://api.weixin.qq.com/cgi-bin/menu/create";
+        WxResponse result = restTemplate.postForObject(url, request, WxResponse.class);
+        logger.info("发送消息:[{}],Request:{},Response:{}", "cgi-bin/message/custom/send", JsonUtil.transferToJson(request), JsonUtil.transferToJson(result));
+        if (result != null && result.getErrcode() == 0) {
+            return CommonResult.success();
+        } else {
+            return CommonResult.failed(result != null ? result.getErrmsg() : "error");
+        }
+    }
+
+    @Override
     public Object userMessage(WxMessageRequest request) {
         if (request != null && StrUtil.equals("text", request.getMsgType())) {
             if (request.getContent().contains("yangkeduo.com")) {
                 return pddMessage(request);
             } else {
                 return taobaoMessage(request);
+            }
+        } else if (request != null && StrUtil.equals("event", request.getMsgType()) && StrUtil.equals("click", request.getEvent())) {
+            String eventKey = request.getEventKey();
+            if (StrUtil.equals("coupon", eventKey)) {
+                WxMessage wxMessage = new WxMessage();
+                wxMessage.setFromUserName(request.getToUserName());
+                wxMessage.setToUserName(request.getFromUserName());
+                wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+                wxMessage.setMsgType("text");
+                wxMessage.setContent("mo-[太阳]小主，你的优惠券送到！每天省一天，幸福多一点！\n" +
+                        "\n" +
+                        "<a href=\"https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com\">点这领取优惠券</a>");
+                return wxMessage;
+            } else if (StrUtil.equals("mt", eventKey)) {
+                WxMessage wxMessage = new WxMessage();
+                wxMessage.setFromUserName(request.getToUserName());
+                wxMessage.setToUserName(request.getFromUserName());
+                wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+                wxMessage.setMsgType("text");
+                wxMessage.setContent("美团mo-[红包]（每天都可，金额看运气哈）加码中，赶紧领↓↓↓\n" +
+                        "<a href=\"http://dpurl.cn/3UaVygJz\">点这领取美团外卖红包</a>");
+                return wxMessage;
+            } else if (StrUtil.equals("ele", eventKey)) {
+                WxMessage wxMessage = new WxMessage();
+                wxMessage.setFromUserName(request.getToUserName());
+                wxMessage.setToUserName(request.getFromUserName());
+                wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+                wxMessage.setMsgType("text");
+                wxMessage.setContent("饿了么mo-[红包]（每天都可，金额看运气哈）加码中，赶紧领↓↓↓\n" +
+                        "<a href=\"https://s.click.ele.me/miWyrPu\">点这领取饿了么外卖红包</a>");
+                return wxMessage;
             }
         }
         return "";
@@ -149,10 +201,18 @@ public class UserServiceImpl implements UserService {
 
     private Object taobaoMessage(WxMessageRequest request) {
         try {
+            String content = request.getContent();
+            if (StrUtil.isNotEmpty(content)) {
+                Pattern pattern = Pattern.compile("「(.*?)」");
+                Matcher matcher = pattern.matcher(content);
+                if (matcher.find()) {
+                    content = matcher.group(1);
+                }
+            }
             TaobaoClient client = getTaobaoClient();
             TbkDgMaterialOptionalRequest req = new TbkDgMaterialOptionalRequest();
             req.setAdzoneId(taobaoProperties.getPid());
-            req.setQ(request.getContent());
+            req.setQ(content);
             req.setSort("tk_rate_des");
             TbkDgMaterialOptionalResponse rsp = client.execute(req);
             if (StrUtil.equals(env, "dev")) {
@@ -188,12 +248,12 @@ public class UserServiceImpl implements UserService {
                 obj3.setUrl(articles.getUrl());
                 spreadGetRequest.setRequests(list2);
                 TbkSpreadGetResponse spreadGetResponse = client.execute(spreadGetRequest);
-                if (spreadGetResponse.getResults()!=null&&spreadGetResponse.getResults().size()>0){
+                if (spreadGetResponse.getResults() != null && spreadGetResponse.getResults().size() > 0) {
                     TbkSpreadGetResponse.TbkSpread spread = spreadGetResponse.getResults().get(0);
                     if (StrUtil.equals(env, "dev")) {
                         logger.info("Method:[{}],Request:{},Response:{}", "Taobao Spread", JsonUtil.transferToJson(spreadGetRequest), JsonUtil.transferToJson(spreadGetResponse));
                     }
-                    articles.setUrl(spread.getContent());
+                    articles.setUrl("https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com" + "?url=" + URLEncoder.encode(spread.getContent()));
                 }
                 articlesList.add(articles);
                 wxMessage.setArticles(articlesList);
@@ -302,5 +362,13 @@ public class UserServiceImpl implements UserService {
             e.printStackTrace();
         }
         return "";
+    }
+
+
+    private void sendWxMessage(WxSendMessage wxSendMessage) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "http://api.weixin.qq.com/cgi-bin/message/custom/send";
+        Object result = restTemplate.postForObject(url, wxSendMessage, Object.class);
+        logger.info("发送消息:[{}],Request:{},Response:{}", "cgi-bin/message/custom/send", JsonUtil.transferToJson(wxSendMessage), JsonUtil.transferToJson(result));
     }
 }

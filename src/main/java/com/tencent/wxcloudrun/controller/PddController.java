@@ -23,9 +23,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 京东api
+ * 多宝客api
  */
-@Api(tags = "PddController", description = "京东api")
+@Api(tags = "PddController", description = "多宝客api")
 @RestController
 public class PddController {
 

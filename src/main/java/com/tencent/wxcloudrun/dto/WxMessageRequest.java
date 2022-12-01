@@ -17,4 +17,10 @@ public class WxMessageRequest {
     private String content;
     @JsonProperty("MsgId")
     private String msgId;
+
+    // 菜单事件
+    @JsonProperty("Event")
+    private String event;
+    @JsonProperty("EventKey")
+    private String eventKey;
 }

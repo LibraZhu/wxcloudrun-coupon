@@ -1,5 +1,7 @@
 package com.tencent.wxcloudrun.controller;
 
+import com.tencent.wxcloudrun.common.api.CommonResult;
+import com.tencent.wxcloudrun.dto.WxMenuRequest;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
 import com.tencent.wxcloudrun.service.UserService;
 import io.swagger.annotations.Api;
@@ -33,5 +35,16 @@ public class UserMessageController {
     @PostMapping(value = "/user/message")
     public Object userMessage(@RequestBody WxMessageRequest request) {
         return userService.userMessage(request);
+    }
+    /**
+     * 创建菜单
+     *
+     * @param request {@link WxMessageRequest}
+     * @return API response json
+     */
+    @ApiOperation("微信公众号创建菜单")
+    @PostMapping(value = "/user/createMenu")
+    public CommonResult createMenu(@RequestBody WxMenuRequest request) {
+        return userService.userCreateMenu(request);
     }
 }

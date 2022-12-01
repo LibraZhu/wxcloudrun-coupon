@@ -1,7 +1,5 @@
 package com.tencent.wxcloudrun.common.api;
 
-import com.github.pagehelper.PageInfo;
-
 import java.util.List;
 
 /**
@@ -30,17 +28,12 @@ public class CommonPage<T> {
      */
     private List<T> list;
 
-    /**
-     * 将PageHelper分页后的list转为分页信息
-     */
-    public static <T> CommonPage<T> restPage(List<T> list) {
+    public static <T> CommonPage<T> page(Integer pageNum, Integer pageSize, Long total, List<T> list) {
         CommonPage<T> result = new CommonPage<T>();
-        PageInfo<T> pageInfo = new PageInfo<T>(list);
-        result.setTotalPage(pageInfo.getPages());
-        result.setPageNum(pageInfo.getPageNum());
-        result.setPageSize(pageInfo.getPageSize());
-        result.setTotal(pageInfo.getTotal());
-        result.setList(pageInfo.getList());
+        result.setPageNum(pageNum);
+        result.setPageSize(pageSize);
+        result.setTotal(total);
+        result.setList(list);
         return result;
     }
 
