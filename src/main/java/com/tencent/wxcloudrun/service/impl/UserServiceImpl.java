@@ -35,6 +35,7 @@ import com.tencent.wxcloudrun.dto.WxResponse;
 import com.tencent.wxcloudrun.model.WxMessage;
 import com.tencent.wxcloudrun.model.WxSendMessage;
 import com.tencent.wxcloudrun.service.UserService;
+import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,9 +69,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public CommonResult userCreateMenu(WxMenuRequest request) {
-        RestTemplate restTemplate = new RestTemplate();
         String url = "http://api.weixin.qq.com/cgi-bin/menu/create";
-        WxResponse result = restTemplate.postForObject(url, request, WxResponse.class);
+        WxResponse result = RestTemplateUtil.getInstance().postForObject(url, request, WxResponse.class);
         logger.info("发送消息:[{}],Request:{},Response:{}", "cgi-bin/message/custom/send", JsonUtil.transferToJson(request), JsonUtil.transferToJson(result));
         if (result != null && result.getErrcode() == 0) {
             return CommonResult.success();
@@ -366,9 +366,8 @@ public class UserServiceImpl implements UserService {
 
 
     private void sendWxMessage(WxSendMessage wxSendMessage) {
-        RestTemplate restTemplate = new RestTemplate();
         String url = "http://api.weixin.qq.com/cgi-bin/message/custom/send";
-        Object result = restTemplate.postForObject(url, wxSendMessage, Object.class);
+        Object result = RestTemplateUtil.getInstance().postForObject(url, wxSendMessage, Object.class);
         logger.info("发送消息:[{}],Request:{},Response:{}", "cgi-bin/message/custom/send", JsonUtil.transferToJson(wxSendMessage), JsonUtil.transferToJson(result));
     }
 }
