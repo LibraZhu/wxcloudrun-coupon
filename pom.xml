@@ -116,7 +116,7 @@
             <artifactId>open-api-sdk-2.0</artifactId>
             <version>2.0</version>
             <scope>system</scope>
-            <systemPath>${project.basedir}/src/main/resources/lib/open-api-sdk-2.0-2022-10-21.jar</systemPath>
+            <systemPath>${project.basedir}/src/main/resources/lib/open-api-sdk-2.0-2023-05-30.jar</systemPath>
         </dependency>
         <dependency>
             <groupId>org.codehaus.jackson</groupId>
