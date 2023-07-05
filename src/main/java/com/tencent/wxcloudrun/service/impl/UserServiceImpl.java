@@ -64,13 +64,10 @@ public class UserServiceImpl implements UserService {
                 return jdMessage(request);
             } else if (request.getContent().contains("yangkeduo.com")) {
                 return pddMessage(request);
-            } else {
-                return taobaoMessage(request);
             }
         } else if (request != null && StrUtil.equals("event", request.getMsgType()) && StrUtil.equals("click", request.getEvent())) {
-            logger.info("接收到菜单事件消息:{}", JsonUtil.transferToJson(request));
             String eventKey = request.getEventKey();
-            if (StrUtil.equals("mt", eventKey)) {
+            if (eventKey.startsWith("https://mp.weixin.qq.com/mp/profile_ext?action=mt")) {
                 WxMessage wxMessage = new WxMessage();
                 wxMessage.setFromUserName(request.getToUserName());
                 wxMessage.setToUserName(request.getFromUserName());
@@ -79,7 +76,7 @@ public class UserServiceImpl implements UserService {
                 wxMessage.setContent("美团mo-[红包]（每天都可，金额看运气哈）加码中，赶紧领↓↓↓\n" +
                         "<a href=\"https://dpurl.cn/hqMOdYzz\">点这领取美团外卖红包</a>");
                 return wxMessage;
-            } else if (StrUtil.equals("ele", eventKey)) {
+            } else if (eventKey.startsWith("https://mp.weixin.qq.com/mp/profile_ext?action=ele")) {
                 WxMessage wxMessage = new WxMessage();
                 wxMessage.setFromUserName(request.getToUserName());
                 wxMessage.setToUserName(request.getFromUserName());
@@ -90,7 +87,7 @@ public class UserServiceImpl implements UserService {
                 return wxMessage;
             }
         }
-        return "";
+        return "success";
     }
 
     private PopClient getPddClient() {
@@ -254,7 +251,6 @@ public class UserServiceImpl implements UserService {
         try {
             if (request.getContent().startsWith("https://item.m.jd.com") || request.getContent().startsWith("https://item.jd.com")) {
                 String url = request.getContent().split("\\?")[0];
-                logger.info(url);
                 String[] splits = url.split("/");
                 String id = splits[splits.length - 1].replace(".html", "");
 
@@ -280,7 +276,7 @@ public class UserServiceImpl implements UserService {
                     WxMessage.Articles articles = new WxMessage.Articles();
                     articles.setTitle("点击领取礼金或优惠券");
                     articles.setDescription("券后价: " + detailResponseEntity.getBody().getData().getPrice_after() + "," + detailResponseEntity.getBody().getData().getGoods_name());
-
+                    articles.setPicUrl(detailResponseEntity.getBody().getData().getPicurl().replace("/jfs", "/s200x200_jfs"));
                     // 获取推广链接
                     String hdkApi = "http://api-gw.haojingke.com/index.php/v1/api/jd/getunionurl";
                     Map<String, Object> map = new HashMap<String, Object>() {{
@@ -291,7 +287,9 @@ public class UserServiceImpl implements UserService {
                         put("giftCouponKey", "");
                     }};
                     ResponseEntity<HJKJDProductLinkResponse> productLinkResponse = RestTemplateUtil.getInstance().postForEntity(hdkApi, map, HJKJDProductLinkResponse.class);
-                    logger.info("[{}],Request:{},Response:{}", "hjk京东转链", JsonUtil.transferToJson(map), JsonUtil.transferToJson(productLinkResponse));
+                    if (StrUtil.equals(env, "dev")) {
+                        logger.info("[{}],Request:{},Response:{}", "hjk京东转链", JsonUtil.transferToJson(map), JsonUtil.transferToJson(productLinkResponse));
+                    }
                     if (productLinkResponse.getBody() != null && productLinkResponse.getBody().getData() != null) {
                         articles.setUrl(productLinkResponse.getBody().getData());
                         articlesList.add(articles);
