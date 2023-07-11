@@ -2,11 +2,17 @@ package com.tencent.wxcloudrun.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.jd.open.api.sdk.DefaultJdClient;
+import com.jd.open.api.sdk.JdClient;
+import com.jd.open.api.sdk.domain.kplunion.GoodsService.request.query.GoodsReq;
+import com.jd.open.api.sdk.request.kplunion.UnionOpenGoodsQueryRequest;
+import com.jd.open.api.sdk.response.kplunion.UnionOpenGoodsQueryResponse;
+import com.pdd.pop.sdk.common.util.DigestUtil;
 import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.pdd.pop.sdk.http.PopClient;
 import com.pdd.pop.sdk.http.PopHttpClient;
 import com.pdd.pop.sdk.http.api.pop.request.PddDdkGoodsPromotionUrlGenerateRequest;
 import com.pdd.pop.sdk.http.api.pop.request.PddDdkGoodsSearchRequest;
+import com.pdd.pop.sdk.http.api.pop.request.PddDdkRpPromUrlGenerateRequest;
 import com.pdd.pop.sdk.http.api.pop.response.PddDdkGoodsPromotionUrlGenerateResponse;
 import com.pdd.pop.sdk.http.api.pop.response.PddDdkGoodsSearchResponse;
 import com.taobao.api.ApiException;
@@ -19,18 +25,23 @@ import com.taobao.api.response.TbkSpreadGetResponse;
 import com.tencent.wxcloudrun.config.properties.ClientProperties;
 import com.tencent.wxcloudrun.config.properties.JDProperties;
 import com.tencent.wxcloudrun.config.properties.TaobaoProperties;
+import com.tencent.wxcloudrun.dto.HDKJDProductLinkResponse;
 import com.tencent.wxcloudrun.dto.HJKJDProductDetailResponse;
 import com.tencent.wxcloudrun.dto.HJKJDProductLinkResponse;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
-import com.tencent.wxcloudrun.model.WxMessage;
+import com.tencent.wxcloudrun.dto.WxMessage;
 import com.tencent.wxcloudrun.service.UserService;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -51,8 +62,6 @@ public class UserServiceImpl implements UserService {
     private TaobaoProperties taobaoProperties;
     @Resource
     private JDProperties jdProperties;
-    @Resource
-    private RestTemplate restTemplate;
 
     @Value("${spring.profiles.active}")
     private String env;
@@ -66,26 +75,7 @@ public class UserServiceImpl implements UserService {
                 return pddMessage(request);
             }
         } else if (request != null && StrUtil.equals("event", request.getMsgType()) && StrUtil.equals("click", request.getEvent())) {
-            String eventKey = request.getEventKey();
-            if (eventKey.startsWith("https://mp.weixin.qq.com/mp/profile_ext?action=mt")) {
-                WxMessage wxMessage = new WxMessage();
-                wxMessage.setFromUserName(request.getToUserName());
-                wxMessage.setToUserName(request.getFromUserName());
-                wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-                wxMessage.setMsgType("text");
-                wxMessage.setContent("美团mo-[红包]（每天都可，金额看运气哈）加码中，赶紧领↓↓↓\n" +
-                        "<a href=\"https://dpurl.cn/hqMOdYzz\">点这领取美团外卖红包</a>");
-                return wxMessage;
-            } else if (eventKey.startsWith("https://mp.weixin.qq.com/mp/profile_ext?action=ele")) {
-                WxMessage wxMessage = new WxMessage();
-                wxMessage.setFromUserName(request.getToUserName());
-                wxMessage.setToUserName(request.getFromUserName());
-                wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-                wxMessage.setMsgType("text");
-                wxMessage.setContent("饿了么mo-[红包]（每天都可，金额看运气哈）加码中，赶紧领↓↓↓\n" +
-                        "<a href=\"https://u.ele.me/Aq8R0lEY\">点这领取饿了么外卖红包</a>");
-                return wxMessage;
-            }
+            // 自定义菜单
         }
         return "success";
     }
@@ -113,6 +103,10 @@ public class UserServiceImpl implements UserService {
                 urlGenerateRequest.setGoodsSignList(Collections.singletonList(goodsListItem.getGoodsSign()));
                 urlGenerateRequest.setPId(clientProperties.getPid());
                 urlGenerateRequest.setSearchId(goodsListItem.getSearchId());
+                urlGenerateRequest.setCustomParameters(JsonUtil.transferToJson(new HashMap<String, Object>() {{
+                    put("uid", clientProperties.getUid());
+                    put("sid", DigestUtil.md5(request.getFromUserName()));
+                }}));
                 PddDdkGoodsPromotionUrlGenerateResponse urlGenerateResponse = getPddClient().syncInvoke(urlGenerateRequest);
                 if (StrUtil.equals(env, "dev")) {
                     logger.info("[{}],Request:{},Response:{}", "PDD转链", JsonUtil.transferToJson(urlGenerateRequest), JsonUtil.transferToJson(urlGenerateResponse));
@@ -131,18 +125,34 @@ public class UserServiceImpl implements UserService {
                     wxMessage.setArticleCount(1);
                     List<WxMessage.Articles> articlesList = new ArrayList<>();
                     WxMessage.Articles articles = new WxMessage.Articles();
+                    BigDecimal coupon = new BigDecimal(goodsListItem.getCouponDiscount());
                     BigDecimal price = new BigDecimal(goodsListItem.getMinGroupPrice());
-                    String newPriceStr = price.divide(new BigDecimal(100), 2, RoundingMode.HALF_UP).toString();
-                    articles.setTitle("点击领取礼金或优惠券");
-                    if (StrUtil.isEmpty(goodsListItem.getGoodsName())) {
-                        articles.setDescription("点击直接购买");
-                    } else {
-                        articles.setDescription(goodsListItem.getGoodsName());
+                    BigDecimal priceEnd = price.subtract(coupon).divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN); // 券后价
+                    BigDecimal commission = priceEnd
+                            .multiply(new BigDecimal(goodsListItem.getPromotionRate()))
+                            .divide(new BigDecimal(1000), 2, RoundingMode.HALF_DOWN); // 返佣
+                    BigDecimal rebate = commission.multiply(new BigDecimal(clientProperties.getRate())); // 返利
+                    if (StrUtil.equals(env, "dev")) {
+                        logger.info("[{}],[{}],[{}],[{}]",
+                                "PDD价格" + price.divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN),
+                                "券后价" + priceEnd,
+                                "返佣" + commission,
+                                "返利" + String.format("%.2f", rebate));
                     }
+                    articles.setTitle("券后价:" + priceEnd + " 约返:" + String.format("%.2f", rebate));
+                    articles.setDescription("【领券下单拿返现】" + goodsListItem.getGoodsName());
                     articles.setPicUrl(goodsListItem.getGoodsThumbnailUrl());
                     articles.setUrl(urlListItem.getMobileUrl());
                     articlesList.add(articles);
                     wxMessage.setArticles(articlesList);
+                    if (StrUtil.equals(env, "dev")) {
+                        logger.info("[{}],[{}],[{}],[{}],[{}]",
+                                "PDD价格" + price.divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN),
+                                "券后价" + priceEnd,
+                                "返佣" + commission,
+                                "返利" + String.format("%.2f", rebate),
+                                urlListItem.getMobileUrl());
+                    }
                     return wxMessage;
                 }
             }
@@ -254,18 +264,8 @@ public class UserServiceImpl implements UserService {
                 String[] splits = url.split("/");
                 String id = splits[splits.length - 1].replace(".html", "");
 
-                // 获取详情
-                String apiKey = "2ec2ffab04637dfc";
-                String api = "http://api-gw.haojingke.com/index.php/v1/api/jd/goodsdetail";
-                Map<String, Object> searchParams = new HashMap<String, Object>() {{
-                    put("apikey", apiKey);
-                    put("goods_id", Long.valueOf(id));
-                }};
-                ResponseEntity<HJKJDProductDetailResponse> detailResponseEntity = RestTemplateUtil.getInstance().postForEntity(api, searchParams, HJKJDProductDetailResponse.class);
-                if (StrUtil.equals(env, "dev")) {
-                    logger.info("[{}],Request:{},Response:{}", "hjk京东商品详情", JsonUtil.transferToJson(searchParams), JsonUtil.transferToJson(detailResponseEntity));
-                }
-                if (detailResponseEntity.getBody() != null && detailResponseEntity.getBody().getData() != null) {
+                HJKJDProductDetailResponse.HJKJDProductDetail productDetail = getHJKJDProductDetail(id);
+                if (productDetail != null) {
                     WxMessage wxMessage = new WxMessage();
                     wxMessage.setFromUserName(request.getToUserName());
                     wxMessage.setToUserName(request.getFromUserName());
@@ -274,24 +274,21 @@ public class UserServiceImpl implements UserService {
                     wxMessage.setArticleCount(1);
                     List<WxMessage.Articles> articlesList = new ArrayList<>();
                     WxMessage.Articles articles = new WxMessage.Articles();
-                    articles.setTitle("点击领取礼金或优惠券");
-                    articles.setDescription("券后价: " + detailResponseEntity.getBody().getData().getPrice_after() + "," + detailResponseEntity.getBody().getData().getGoods_name());
-                    articles.setPicUrl(detailResponseEntity.getBody().getData().getPicurl().replace("/jfs", "/s200x200_jfs"));
-                    // 获取推广链接
-                    String hdkApi = "http://api-gw.haojingke.com/index.php/v1/api/jd/getunionurl";
-                    Map<String, Object> map = new HashMap<String, Object>() {{
-                        put("apikey", apiKey);
-                        put("goods_id", Long.valueOf(id));
-                        put("positionid", jdProperties.getPositionId());
-                        put("type", 1);
-                        put("giftCouponKey", "");
-                    }};
-                    ResponseEntity<HJKJDProductLinkResponse> productLinkResponse = RestTemplateUtil.getInstance().postForEntity(hdkApi, map, HJKJDProductLinkResponse.class);
+                    BigDecimal rebate = new BigDecimal(productDetail.getCommission()).multiply(new BigDecimal(jdProperties.getRate()));
+                    articles.setTitle("券后价:" + productDetail.getPrice_after() + " 约返:" + String.format("%.2f", rebate));
+                    articles.setDescription("【领券下单拿返现】" + productDetail.getGoods_name());
+                    articles.setPicUrl(productDetail.getPicurl().replace("/jfs", "/s200x200_jfs"));
+                    String unionUrl = getHDKUnionUrl(id, productDetail.getCouponurl(), DigestUtil.md5(request.getFromUserName()));
                     if (StrUtil.equals(env, "dev")) {
-                        logger.info("[{}],Request:{},Response:{}", "hjk京东转链", JsonUtil.transferToJson(map), JsonUtil.transferToJson(productLinkResponse));
+                        logger.info("[{}],[{}],[{}],[{}],[{}]",
+                                "JD价格" + productDetail.getPrice(),
+                                "券后价" + productDetail.getPrice_after(),
+                                "返佣" + productDetail.getCommission(),
+                                "返利" + String.format("%.2f", rebate),
+                                unionUrl);
                     }
-                    if (productLinkResponse.getBody() != null && productLinkResponse.getBody().getData() != null) {
-                        articles.setUrl(productLinkResponse.getBody().getData());
+                    if (unionUrl != null) {
+                        articles.setUrl(unionUrl);
                         articlesList.add(articles);
                         wxMessage.setArticles(articlesList);
                         return wxMessage;
@@ -303,5 +300,127 @@ public class UserServiceImpl implements UserService {
             e.printStackTrace();
         }
         return "success";
+    }
+
+    private String getHDKApiKey() {
+        return "59623DEAE2F1";
+    }
+
+    private String getHJKApiKey() {
+        return "2ec2ffab04637dfc";
+    }
+
+    /**
+     * 好单库 京东推广链接
+     *
+     * @param id         商品id
+     * @param coupon_url 优惠券链接
+     * @param subUnionId 子渠道
+     * @return
+     */
+    private String getHDKUnionUrl(String id, String coupon_url, String subUnionId) {
+        // 获取推广链接
+        String hdkApi = "http://v2.api.haodanku.com/get_jditems_link";
+        MultiValueMap<String, Object> map = new LinkedMultiValueMap<String, Object>();
+        map.add("apikey", getHDKApiKey());
+        map.add("material_id", Long.valueOf(id));
+        map.add("coupon_url", coupon_url);
+        map.add("union_id", jdProperties.getUnionId());
+        map.add("pid", jdProperties.getPid());
+        map.add("subUnionId", subUnionId);
+        System.out.println(subUnionId);
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        HttpEntity<MultiValueMap<String, Object>> param = new HttpEntity<>(map, httpHeaders);
+        HDKJDProductLinkResponse productLinkResponse = RestTemplateUtil.getInstance().postForObject(hdkApi, param, HDKJDProductLinkResponse.class);
+        if (StrUtil.equals(env, "dev")) {
+            logger.info("[{}],Request:{},Response:{}", "hjk京东转链", JsonUtil.transferToJson(map), JsonUtil.transferToJson(productLinkResponse));
+        }
+        if (productLinkResponse != null && productLinkResponse.getData() != null) {
+            return productLinkResponse.getData().getShort_url();
+        }
+        return null;
+    }
+
+    /**
+     * 蚂蚁星球 京东商详
+     *
+     * @param id 商品id
+     * @return
+     */
+    private HJKJDProductDetailResponse.HJKJDProductDetail getHJKJDProductDetail(String id) {
+        // 获取详情
+        String api = "http://api-gw.haojingke.com/index.php/v1/api/jd/goodsdetail";
+        Map<String, Object> searchParams = new HashMap<String, Object>() {{
+            put("apikey", getHJKApiKey());
+            put("goods_id", Long.valueOf(id));
+        }};
+        ResponseEntity<HJKJDProductDetailResponse> detailResponseEntity = RestTemplateUtil.getInstance().postForEntity(api, searchParams, HJKJDProductDetailResponse.class);
+        if (StrUtil.equals(env, "dev")) {
+            logger.info("[{}],Request:{},Response:{}", "hjk京东商品详情", JsonUtil.transferToJson(searchParams), JsonUtil.transferToJson(detailResponseEntity));
+        }
+        if (detailResponseEntity.getBody() != null) {
+            return detailResponseEntity.getBody().getData();
+        }
+        return null;
+    }
+
+    /**
+     * 蚂蚁星球 京东推广链接
+     *
+     * @param id 商品id
+     * @return
+     */
+    private String getHJKUnionUrl(String id) {
+        // 获取推广链接
+        String hdkApi = "http://api-gw.haojingke.com/index.php/v1/api/jd/getunionurl";
+        Map<String, Object> map = new HashMap<String, Object>() {{
+            put("apikey", getHJKApiKey());
+            put("goods_id", Long.valueOf(id));
+            put("positionid", jdProperties.getPositionId());
+            put("type", 1);
+            put("giftCouponKey", "");
+        }};
+        ResponseEntity<HJKJDProductLinkResponse> productLinkResponse = RestTemplateUtil.getInstance().postForEntity(hdkApi, map, HJKJDProductLinkResponse.class);
+        if (StrUtil.equals(env, "dev")) {
+            logger.info("[{}],Request:{},Response:{}", "hjk京东转链", JsonUtil.transferToJson(map), JsonUtil.transferToJson(productLinkResponse));
+        }
+        if (productLinkResponse.getBody() != null && productLinkResponse.getBody().getData() != null) {
+            return productLinkResponse.getBody().getData();
+        }
+        return null;
+    }
+
+    @Override
+    public Object pddAuthUrl() {
+        PddDdkRpPromUrlGenerateRequest request = new PddDdkRpPromUrlGenerateRequest();
+        request.setChannelType(10);
+        List<String> pIdList = new ArrayList<>();
+        pIdList.add(clientProperties.getPid());
+        request.setPIdList(pIdList);
+        request.setCustomParameters(JsonUtil.transferToJson(new HashMap<String, Object>() {{
+            put("uid", clientProperties.getUid());
+        }}));
+        try {
+            //同步调用
+            return getPddClient().syncInvoke(request);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    public static void main(String[] args) {
+        JdClient client = new DefaultJdClient("https://api.jd.com/routerjson", null, "fd07e7373553e152016b787fba46c182", "eaf58fbf234c406186632d3dcf17771a");
+        UnionOpenGoodsQueryRequest request = new UnionOpenGoodsQueryRequest();
+        GoodsReq goodsReqDTO = new GoodsReq();
+        request.setGoodsReqDTO(goodsReqDTO);
+        request.setVersion("1.0");
+        try {
+            UnionOpenGoodsQueryResponse response = client.execute(request);
+            System.out.println(JsonUtil.transferToJson(response));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

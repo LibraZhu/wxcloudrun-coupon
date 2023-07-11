@@ -1,9 +1,8 @@
 package com.tencent.wxcloudrun.controller;
 
 import com.tencent.wxcloudrun.service.UserService;
-import io.swagger.annotations.Api;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -11,7 +10,6 @@ import java.util.Map;
 /**
  * 多宝客api
  */
-@Api(tags = "PddController", description = "多宝客api")
 @RestController
 public class PddController {
 
@@ -21,9 +19,9 @@ public class PddController {
         this.userService = userService;
     }
 
-    @GetMapping(value = "/pdd")
+    @PostMapping(value = "/pdd/authUrl")
     public Object pdd(Map<String, Object> request) {
-        return "";
+        return userService.pddAuthUrl();
     }
 
 }

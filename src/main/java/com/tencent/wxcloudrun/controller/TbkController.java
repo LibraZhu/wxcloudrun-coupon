@@ -2,7 +2,6 @@ package com.tencent.wxcloudrun.controller;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
-import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.taobao.api.ApiException;
 import com.taobao.api.DefaultTaobaoClient;
 import com.taobao.api.TaobaoClient;
@@ -11,7 +10,6 @@ import com.taobao.api.response.TbkDgOptimusMaterialResponse;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.api.CommonResult;
 import com.tencent.wxcloudrun.config.properties.TaobaoProperties;
-import io.swagger.annotations.Api;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,7 +22,6 @@ import javax.annotation.Resource;
 /**
  * 淘宝联盟api
  */
-@Api(tags = "TbkController", description = "淘宝联盟api")
 @RestController
 @RequestMapping("/tbk")
 public class TbkController {

@@ -11,5 +11,6 @@ public class JDProperties {
     private String unionId;
     private Long positionId;
     private String pid;
+    private String rate;
 
 }

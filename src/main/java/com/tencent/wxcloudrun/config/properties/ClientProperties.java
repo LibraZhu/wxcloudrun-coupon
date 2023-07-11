@@ -9,5 +9,7 @@ public class ClientProperties {
     private String clientId;
     private String clientSecret;
     private String pid;
+    private String uid;
+    private String rate;
 
 }

@@ -21,6 +21,8 @@ client:
   clientId: 5ffc31b3d3ef472faaa23ed35081a998
   clientSecret: 940114100d31bff5ab16b4bbb19ec2ad89b78693
   pid: "35772384_257791152"
+  uid: 7777
+  rate: 0.5
 
 taobao:
   url: https://eco.taobao.com/router/rest
@@ -35,3 +37,4 @@ jd:
   unionId: 2031307306
   positionId: 3100085830
   pid: "2031307306_4100960469_3100085830"
+  rate: 0.5
