@@ -33,36 +33,35 @@ public class ScheduledConfig implements SchedulingConfigurer {
 
     @Override
     public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
-        taskRegistrar.addTriggerTask(() -> {
-            logger.info("同步JD订单");
-            // 同步jd
-            String startTime = syncTaskTimeMap.get(OrderSource.JD);
-            String endTime;
-            // 第一次同步十分钟之前的订单，后续每${SYNC_INTERVAL}分钟同步一次
-            if (ObjectUtil.isEmpty(startTime)) {
-                DateTime now = DateUtil.date();
-                startTime = DateUtil.formatDateTime(DateUtil.offsetMinute(now, -10));
-                endTime = DateUtil.formatDateTime(now);
-            } else {
-                endTime = DateUtil.formatDateTime(DateUtil.offsetMinute(DateUtil.parseDateTime(startTime), syncInterval));
-            }
-            jdService.syncTask(startTime, endTime);
-            syncTaskTimeMap.put(OrderSource.JD, endTime);
-        }, triggerContext -> new CronTrigger(syncIntervalCron).nextExecutionTime(triggerContext));
-        taskRegistrar.addTriggerTask(() -> {
-            // 同步pdd
-            String startTime = syncTaskTimeMap.get(OrderSource.PDD);
-            String endTime;
-            // 第一次同步十分钟之前的订单，后续每${SYNC_INTERVAL}分钟同步一次
-            if (ObjectUtil.isEmpty(startTime)) {
-                DateTime now = DateUtil.date();
-                startTime = DateUtil.formatDateTime(DateUtil.offsetMinute(now, -10));
-                endTime = DateUtil.formatDateTime(now);
-            } else {
-                endTime = DateUtil.formatDateTime(DateUtil.offsetMinute(DateUtil.parseDateTime(startTime), syncInterval));
-            }
-            pddService.syncTask(startTime, endTime);
-            syncTaskTimeMap.put(OrderSource.PDD, endTime);
-        }, triggerContext -> new CronTrigger(syncIntervalCron).nextExecutionTime(triggerContext));
+//        taskRegistrar.addTriggerTask(() -> {
+//            // 同步jd
+//            String startTime = syncTaskTimeMap.get(OrderSource.JD);
+//            String endTime;
+//            // 第一次同步十分钟之前的订单，后续每${SYNC_INTERVAL}分钟同步一次
+//            if (ObjectUtil.isEmpty(startTime)) {
+//                DateTime now = DateUtil.date();
+//                startTime = DateUtil.formatDateTime(DateUtil.offsetMinute(now, -10));
+//                endTime = DateUtil.formatDateTime(now);
+//            } else {
+//                endTime = DateUtil.formatDateTime(DateUtil.offsetMinute(DateUtil.parseDateTime(startTime), syncInterval));
+//            }
+//            jdService.syncTask(startTime, endTime);
+//            syncTaskTimeMap.put(OrderSource.JD, endTime);
+//        }, triggerContext -> new CronTrigger(syncIntervalCron).nextExecutionTime(triggerContext));
+//        taskRegistrar.addTriggerTask(() -> {
+//            // 同步pdd
+//            String startTime = syncTaskTimeMap.get(OrderSource.PDD);
+//            String endTime;
+//            // 第一次同步十分钟之前的订单，后续每${SYNC_INTERVAL}分钟同步一次
+//            if (ObjectUtil.isEmpty(startTime)) {
+//                DateTime now = DateUtil.date();
+//                startTime = DateUtil.formatDateTime(DateUtil.offsetMinute(now, -10));
+//                endTime = DateUtil.formatDateTime(now);
+//            } else {
+//                endTime = DateUtil.formatDateTime(DateUtil.offsetMinute(DateUtil.parseDateTime(startTime), syncInterval));
+//            }
+//            pddService.syncTask(startTime, endTime);
+//            syncTaskTimeMap.put(OrderSource.PDD, endTime);
+//        }, triggerContext -> new CronTrigger(syncIntervalCron).nextExecutionTime(triggerContext));
     }
 }
