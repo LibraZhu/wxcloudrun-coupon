@@ -256,6 +256,14 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       request.setGoodsReq(goodsReq);
       request.setVersion("1.0");
       UnionOpenGoodsJingfenQueryResponse response = getJDClient().execute(request);
+      logger.info(
+          "[{}],Request:{},Response:{}",
+          "京粉商品列表",
+          JsonUtil.transferToJson(request),
+          JsonUtil.transferToJson(response));
+      if (response == null || response.getQueryResult() == null) {
+        Asserts.fail("请求异常");
+      }
       if (response.getQueryResult().getCode() != 200) {
         Asserts.fail(response.getQueryResult().getMessage());
       }
