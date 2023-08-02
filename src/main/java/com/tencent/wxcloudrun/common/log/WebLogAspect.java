@@ -27,9 +27,9 @@ import java.util.*;
 /**
  * 统一日志处理切面
  */
-@Aspect
-@Component
-@Order(1)
+//@Aspect
+//@Component
+//@Order(1)
 public class WebLogAspect {
     private static final Logger LOGGER = LoggerFactory.getLogger(WebLogAspect.class);
 
