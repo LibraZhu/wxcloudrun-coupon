@@ -37,7 +37,7 @@ public class TbkController {
     }
 
     @GetMapping(value = "/material")
-    public CommonResult material(String materialId, Integer page, Integer pageSize) {
+    public CommonResult material(String materialId, Long page, Long pageSize) {
         try {
             TaobaoClient client = getTbkClient();
             TbkDgOptimusMaterialRequest req = new TbkDgOptimusMaterialRequest();

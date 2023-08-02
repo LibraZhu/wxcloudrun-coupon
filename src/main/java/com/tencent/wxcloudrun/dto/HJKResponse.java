@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class HJKResponse {
-    private long status_code;
-    private String message;
+  private long status_code;
+  private String message;
 }

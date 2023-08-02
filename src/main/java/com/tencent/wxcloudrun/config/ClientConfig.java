@@ -1,8 +1,6 @@
 package com.tencent.wxcloudrun.config;
 
-import com.tencent.wxcloudrun.config.properties.ClientProperties;
-import com.tencent.wxcloudrun.config.properties.JDProperties;
-import com.tencent.wxcloudrun.config.properties.TaobaoProperties;
+import com.tencent.wxcloudrun.config.properties.*;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,6 +22,16 @@ public class ClientConfig {
     @ConfigurationProperties(prefix = "jd")
     public JDProperties jdProperties() {
         return new JDProperties();
+    }
+    @Bean
+    @ConfigurationProperties(prefix = "hjk")
+    public HJKProperties hjkProperties() {
+        return new HJKProperties();
+    }
+    @Bean
+    @ConfigurationProperties(prefix = "hdk")
+    public HDKProperties hdkProperties() {
+        return new HDKProperties();
     }
 
 }

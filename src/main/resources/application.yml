@@ -6,7 +6,7 @@ spring:
     active: prop
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${MYSQL_ADDRESS}/${MYSQL_DATABASE:springboot_demo}
+    url: jdbc:mysql://${MYSQL_ADDRESS}/${MYSQL_DATABASE:springboot_demo}?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
     username: ${MYSQL_USERNAME}
     password: ${MySQL_PASSWORD}
   mvc:
@@ -22,7 +22,7 @@ client:
   clientSecret: 940114100d31bff5ab16b4bbb19ec2ad89b78693
   pid: "35772384_257791152"
   uid: 7777
-  rate: 0.5
+  rate: 0.51
 
 taobao:
   url: https://eco.taobao.com/router/rest
@@ -37,4 +37,12 @@ jd:
   unionId: 2031307306
   positionId: 3100085830
   pid: "2031307306_4100960469_3100085830"
-  rate: 0.5
+  rate: 0.51
+
+hjk:
+  apiKey: 2ec2ffab04637dfc
+  apiUrl: http://api-gw.haojingke.com/index.php/v1/api
+
+hdk:
+  apiKey: 59623DEAE2F1
+  apiUrl: http://v2.api.haodanku.com
