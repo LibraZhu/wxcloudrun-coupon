@@ -12,6 +12,8 @@ import com.tencent.wxcloudrun.model.PmsWallet;
  * @since 2023年08月08日
  */
 public interface PmsWalletService extends IService<PmsWallet> {
+  void add(Long uid);
+
   WalletMoneyDto number(WalletParam request);
 
   PmsWallet info(WalletParam request);

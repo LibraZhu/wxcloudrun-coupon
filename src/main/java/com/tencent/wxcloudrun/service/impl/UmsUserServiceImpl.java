@@ -35,6 +35,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
   @Resource private TBService tbService;
   @Resource private DYService dyService;
   @Resource private WPHService wpService;
+  @Resource private PmsWalletService pmsWalletService;
 
   @Override
   public Object userMessage(WxMessageRequest request) {
@@ -70,14 +71,14 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
       Asserts.fail("openid不能为空");
     }
     try{
-      QueryWrapper<UmsUser> queryWrapper = new QueryWrapper<>();
-      queryWrapper.eq("openid", openid);
-      UmsUser umsUser = this.getOne(queryWrapper);
+      UmsUser umsUser = lambdaQuery().eq(UmsUser::getOpenid,openid).one();
       if (umsUser == null) {
         umsUser = new UmsUser();
         umsUser.setOpenid(openid);
         umsUser.setUnionid(unionid);
         baseMapper.insert(umsUser);
+        //
+        pmsWalletService.add(Long.valueOf(umsUser.getId()));
       } else {
         if (ObjectUtil.isNotEmpty(unionid)) {
           baseMapper.updateById(umsUser);

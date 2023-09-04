@@ -37,11 +37,18 @@ public class PmsWalletServiceImpl extends ServiceImpl<PmsWalletMapper, PmsWallet
   @Resource PmsWalletRecordService pmsWalletRecordService;
 
   @Override
+  public void add(Long uid) {
+    PmsWallet pmsWallet = new PmsWallet();
+    pmsWallet.setUid(uid);
+    baseMapper.insert(pmsWallet);
+  }
+
+  @Override
   public WalletMoneyDto number(WalletParam request) {
     WalletMoneyDto walletMoneyDto = new WalletMoneyDto();
     // 获取余额
     PmsWallet wallet = lambdaQuery().eq(PmsWallet::getUid, request.getUid()).one();
-    walletMoneyDto.setMoney(wallet.getMoney());
+    walletMoneyDto.setMoney(Optional.ofNullable(wallet).map(PmsWallet::getMoney).orElse("0.00"));
     // 获取待结算订单数和金额
     List<OmsOrder> list =
         new LambdaQueryChainWrapper<>(omsOrderService.getBaseMapper())
