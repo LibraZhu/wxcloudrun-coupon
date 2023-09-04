@@ -56,6 +56,7 @@ public class GlobalExceptionHandler {
     @ResponseBody
     @ExceptionHandler(value = Exception.class)
     public CommonResult handle(Exception e) {
+        e.printStackTrace();
         return CommonResult.failed("服务器异常");
     }
 }
