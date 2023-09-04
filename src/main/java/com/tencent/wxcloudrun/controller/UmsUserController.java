@@ -37,7 +37,6 @@ public class UmsUserController {
   @PostMapping(value = "/login")
   @ResponseBody
   public CommonResult<UmsUser> register(@RequestHeader Map<String, String> headers) {
-    logger.info("登录：" + JSONUtil.toJsonStr(headers));
     return CommonResult.success(
         umsUserService.login(headers.get("x-wx-from-openid"), headers.get("x-wx-from-unionid")));
   }

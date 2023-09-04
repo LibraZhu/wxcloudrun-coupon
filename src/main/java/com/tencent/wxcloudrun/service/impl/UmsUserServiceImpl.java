@@ -69,20 +69,26 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
     if (ObjectUtil.isEmpty(openid)) {
       Asserts.fail("openid不能为空");
     }
-    QueryWrapper<UmsUser> queryWrapper = new QueryWrapper<>();
-    queryWrapper.eq("openid", openid);
-    UmsUser umsUser = this.getOne(queryWrapper);
-    if (umsUser == null) {
-      umsUser = new UmsUser();
-      umsUser.setOpenid(openid);
-      umsUser.setUnionid(unionid);
-      baseMapper.insert(umsUser);
-    } else {
-      if (ObjectUtil.isNotEmpty(unionid)) {
-        baseMapper.updateById(umsUser);
+    try{
+
+      QueryWrapper<UmsUser> queryWrapper = new QueryWrapper<>();
+      queryWrapper.eq("openid", openid);
+      UmsUser umsUser = this.getOne(queryWrapper);
+      if (umsUser == null) {
+        umsUser = new UmsUser();
+        umsUser.setOpenid(openid);
+        umsUser.setUnionid(unionid);
+        baseMapper.insert(umsUser);
+      } else {
+        if (ObjectUtil.isNotEmpty(unionid)) {
+          baseMapper.updateById(umsUser);
+        }
       }
+      return umsUser;
+    }catch (Exception e){
+      e.printStackTrace();
     }
-    return umsUser;
+    return null;
   }
 
   @Override
