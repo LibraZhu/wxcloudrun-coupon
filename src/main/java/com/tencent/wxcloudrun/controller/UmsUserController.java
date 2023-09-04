@@ -37,15 +37,14 @@ public class UmsUserController {
   @PostMapping(value = "/login")
   @ResponseBody
   public CommonResult<UmsUser> register(@RequestHeader Map<String, String> headers) {
-    logger.info("登录：" + JSONUtil.toJsonStr(headers));
     return CommonResult.success(
-        umsUserService.login(headers.get("openid"), headers.get("unionid")));
+        umsUserService.login(headers.get("x-wx-from-openid"), headers.get("x-wx-from-unionid")));
   }
 
   @ApiOperation("用户信息更新")
   @PostMapping(value = "/update")
   @ResponseBody
-  public CommonResult<Object> register(@Validated @RequestBody UserInfoParam request) {
+  public CommonResult<Object> update(@Validated @RequestBody UserInfoParam request) {
     return CommonResult.success(umsUserService.update(request));
   }
 

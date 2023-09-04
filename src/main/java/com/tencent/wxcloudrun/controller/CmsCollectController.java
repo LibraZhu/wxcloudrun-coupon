@@ -40,7 +40,7 @@ public class CmsCollectController {
     String uid = request.getUid();
     // 如果没有uid参数，先登录获取uid
     if (ObjectUtil.isEmpty(uid)) {
-      uid = umsUserService.login(headers.get("openid"), headers.get("unionid")).getId().toString();
+      uid = umsUserService.login(headers.get("x-wx-from-openid"), headers.get("x-wx-from-unionid")).getId().toString();
       request.setUid(uid);
     }
     return CommonResult.success(cmsCollectService.check(request));
