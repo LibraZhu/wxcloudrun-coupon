@@ -70,7 +70,6 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
       Asserts.fail("openid不能为空");
     }
     try{
-
       QueryWrapper<UmsUser> queryWrapper = new QueryWrapper<>();
       queryWrapper.eq("openid", openid);
       UmsUser umsUser = this.getOne(queryWrapper);
