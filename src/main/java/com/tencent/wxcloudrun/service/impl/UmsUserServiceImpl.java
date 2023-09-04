@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.dao.UmsUserMapper;
 import com.tencent.wxcloudrun.dto.UserInfoParam;
@@ -37,23 +38,29 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
 
   @Override
   public Object userMessage(WxMessageRequest request) {
+    Object message = "success";
     if (request != null && StrUtil.equals("text", request.getMsgType())) {
       if (request.getContent().startsWith("https://item.m.jd.com")
           || request.getContent().startsWith("https://item.jd.com")) {
-        return jdService.wxMessage(request);
+        message = jdService.wxMessage(request);
       } else if (request.getContent().contains("yangkeduo.com")) {
-        return pddService.wxMessage(request);
+        message = pddService.wxMessage(request);
       } else if (request.getContent().contains("m.tb.cn")
           || request.getContent().contains("item.taobao.com")
           || request.getContent().contains("detail.tmall.com")) {
-        return tbService.wxMessage(request);
+        message = tbService.wxMessage(request);
       } else if (request.getContent().contains("v.douyin.com")) {
-        return dyService.wxMessage(request);
+        message = dyService.wxMessage(request);
       } else if (request.getContent().contains("t.vip.com")) {
-        return wpService.wxMessage(request);
+        message = wpService.wxMessage(request);
       }
     }
-    return "success";
+    logger.info(
+        "[{}],Request:{},Response:{}",
+        "公众号消息查询",
+        JsonUtil.transferToJson(request),
+        ObjectUtil.equals(message, "success") ? "success" : JsonUtil.transferToJson(message));
+    return message;
   }
 
   @Override

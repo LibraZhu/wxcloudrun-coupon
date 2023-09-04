@@ -196,6 +196,7 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       String keyword = matcher.group(1).trim();
       ProductQueryParam param = new ProductQueryParam();
       param.setKeyword(keyword);
+      param.setUid("dds");
       CommonPage<HJKJDProduct> page = searchProduct(param);
       if (ObjectUtil.isNotEmpty(page.getList())) {
         HJKJDProduct product = page.getList().get(0);

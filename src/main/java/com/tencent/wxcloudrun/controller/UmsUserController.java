@@ -1,11 +1,15 @@
 package com.tencent.wxcloudrun.controller;
 
+import cn.hutool.json.JSON;
+import cn.hutool.json.JSONUtil;
 import com.tencent.wxcloudrun.common.api.CommonResult;
 import com.tencent.wxcloudrun.dto.UserInfoParam;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
 import com.tencent.wxcloudrun.model.UmsUser;
 import com.tencent.wxcloudrun.service.UmsUserService;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +25,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/user")
 public class UmsUserController {
+  final Logger logger = LoggerFactory.getLogger(UmsUserController.class);
 
   UmsUserService umsUserService;
 
@@ -32,6 +37,7 @@ public class UmsUserController {
   @PostMapping(value = "/login")
   @ResponseBody
   public CommonResult<UmsUser> register(@RequestHeader Map<String, String> headers) {
+    logger.info("登录：" + JSONUtil.toJsonStr(headers));
     return CommonResult.success(
         umsUserService.login(headers.get("openid"), headers.get("unionid")));
   }
