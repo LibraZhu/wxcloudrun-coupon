@@ -65,6 +65,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
 
   @Override
   public UmsUser login(String openid, String unionid) {
+    logger.info("[{}],openid:{},unionid:{}", "登录", openid, unionid);
     if (ObjectUtil.isEmpty(openid)) {
       Asserts.fail("openid不能为空");
     }
