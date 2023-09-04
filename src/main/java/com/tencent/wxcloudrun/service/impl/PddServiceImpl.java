@@ -6,28 +6,24 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.pdd.pop.sdk.common.util.DigestUtil;
 import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.pdd.pop.sdk.http.PopClient;
 import com.pdd.pop.sdk.http.PopHttpClient;
-import com.pdd.pop.sdk.http.api.pop.request.PddDdkGoodsPromotionUrlGenerateRequest;
-import com.pdd.pop.sdk.http.api.pop.request.PddDdkGoodsSearchRequest;
-import com.pdd.pop.sdk.http.api.pop.request.PddDdkOrderListIncrementGetRequest;
-import com.pdd.pop.sdk.http.api.pop.request.PddDdkRpPromUrlGenerateRequest;
-import com.pdd.pop.sdk.http.api.pop.response.PddDdkGoodsPromotionUrlGenerateResponse;
-import com.pdd.pop.sdk.http.api.pop.response.PddDdkGoodsSearchResponse;
-import com.pdd.pop.sdk.http.api.pop.response.PddDdkOrderListIncrementGetResponse;
+import com.pdd.pop.sdk.http.api.pop.request.*;
+import com.pdd.pop.sdk.http.api.pop.response.*;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.ClientProperties;
 import com.tencent.wxcloudrun.dao.OmsOrderMapper;
 import com.tencent.wxcloudrun.dto.HJKJDProduct;
-import com.tencent.wxcloudrun.dto.PddProductQueryParam;
+import com.tencent.wxcloudrun.dto.ProductQueryParam;
 import com.tencent.wxcloudrun.dto.WxMessage;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
-import com.tencent.wxcloudrun.enums.OrderSource;
+import com.tencent.wxcloudrun.enums.OrderStatus;
+import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.PddService;
+import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -116,13 +112,13 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
       request.setPageSize(50);
       request.setReturnCount(false);
       PddDdkOrderListIncrementGetResponse response = getPddClient().syncInvoke(request);
-      if (StrUtil.equals(env, "dev")) {
-        logger.info(
-            "Method:[{}],Request:{},Response:{}",
-            "SyncPddOrder",
-            JsonUtil.transferToJson(request),
-            JsonUtil.transferToJson(response));
-      }
+      XLogger.log(
+          logger,
+          env,
+          "Method:[{}],Request:{},Response:{}",
+          "SyncPddOrder",
+          JsonUtil.transferToJson(request),
+          JsonUtil.transferToJson(response));
       if (response.getOrderListGetResponse() != null
           && response.getOrderListGetResponse().getOrderList() != null) {
         List<OmsOrder> list =
@@ -130,9 +126,9 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                 .flatMap(
                     (item) -> {
                       OmsOrder order = new OmsOrder();
-                      order.setOrderSource(OrderSource.PDD.getCode());
-                      order.setOrderId(item.getOrderId());
-                      order.setOrderSn(item.getOrderSn());
+                      order.setOrderSource(ProductSource.PDD.getCode());
+                      order.setOrderId(item.getOrderSn());
+                      order.setOrderSn(item.getOrderId());
                       if (ObjectUtil.isNotEmpty(item.getOrderPayTime())) {
                         order.setOrderTime(
                             LocalDateTime.ofInstant(
@@ -153,38 +149,62 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       }
                       order.setCompared(item.getPriceCompareStatus());
                       order.setPid(item.getPId());
-                      order.setSkuId(item.getGoodsId().toString());
+                      order.setSkuId(item.getGoodsSign());
                       order.setSkuName(item.getGoodsName());
                       order.setSkuNum(item.getGoodsQuantity());
                       order.setImageUrl(item.getGoodsThumbnailUrl());
                       order.setPrice(
                           new BigDecimal(item.getGoodsPrice().toString())
-                              .divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN)
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
                               .toString());
                       order.setCommissionRate(
                           new BigDecimal(item.getPromotionRate().toString())
-                              .divide(new BigDecimal(10), 1, RoundingMode.HALF_DOWN)
+                              .divide(new BigDecimal(10), 1, RoundingMode.DOWN)
                               .toString());
                       order.setActualCosPrice(
                           new BigDecimal(item.getOrderAmount().toString())
-                              .divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN)
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
                               .toString());
                       order.setActualFee(
                           new BigDecimal(item.getPromotionAmount().toString())
-                              .divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN)
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
                               .toString());
                       order.setStatus(item.getOrderStatus());
+                      if (item.getOrderStatus() == 0 || item.getOrderStatus() == 1) {
+                        order.setStatus(OrderStatus.DELIVER.getCode());
+                      } else if (item.getOrderStatus() == 2) {
+                        order.setStatus(OrderStatus.COMPLETE.getCode());
+                      } else if (item.getOrderStatus() == 4 || item.getOrderStatus() == 10) {
+                        order.setStatus(OrderStatus.INVALID.getCode());
+                        order.setStatusDes(item.getOrderStatus() + "-" + item.getOrderStatusDesc());
+                      }
                       try {
                         JSONObject customParameters = JSONUtil.parseObj(item.getCustomParameters());
                         order.setUid(customParameters.getStr("sid"));
                       } catch (Exception ee) {
                         ee.printStackTrace();
                       }
+                      order.setRate(clientProperties.getRate());
+                      // 金额小于0.02不算返利
+                      order.setRebate(
+                          item.getPromotionAmount() >= 2
+                              ? new BigDecimal(order.getActualFee())
+                                  .multiply(new BigDecimal(order.getRate()))
+                                  .setScale(2, RoundingMode.DOWN)
+                                  .stripTrailingZeros()
+                                  .toPlainString()
+                              : "0.00");
                       return Arrays.stream(new OmsOrder[] {order});
                     })
                 .collect(Collectors.toList());
-        logger.info(
-            "同步订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.transferToJson(list));
+        XLogger.log(
+            logger,
+            env,
+            "同步拼多多订单:[{}~{}],第{}页,{}",
+            startTime,
+            endTime,
+            page,
+            JsonUtil.transferToJson(list));
         if (list.size() > 0) {
           baseMapper.saveOrUpdateList(list);
           // 是否还有更多
@@ -203,137 +223,58 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
 
   @Override
   public Object wxMessage(WxMessageRequest request) {
-    PddDdkGoodsSearchRequest searchRequest = new PddDdkGoodsSearchRequest();
-    searchRequest.setKeyword(request.getContent());
-    searchRequest.setPid(clientProperties.getPid());
-    try {
-      // 同步调用
-      PddDdkGoodsSearchResponse searchResponse = getPddClient().syncInvoke(searchRequest);
-      if (StrUtil.equals(env, "dev")) {
-        logger.info(
-            "[{}],Request:{},Response:{}",
-            "PDD商详",
-            JsonUtil.transferToJson(searchRequest),
-            JsonUtil.transferToJson(searchResponse));
-      }
-      if (searchResponse.getGoodsSearchResponse().getGoodsList() != null
-          && searchResponse.getGoodsSearchResponse().getGoodsList().size() > 0) {
-        PddDdkGoodsSearchResponse.GoodsSearchResponseGoodsListItem goodsListItem =
-            searchResponse.getGoodsSearchResponse().getGoodsList().get(0);
-
-        PddDdkGoodsPromotionUrlGenerateRequest urlGenerateRequest =
-            new PddDdkGoodsPromotionUrlGenerateRequest();
-        urlGenerateRequest.setGoodsSignList(
-            Collections.singletonList(goodsListItem.getGoodsSign()));
-        urlGenerateRequest.setPId(clientProperties.getPid());
-        urlGenerateRequest.setSearchId(goodsListItem.getSearchId());
-        urlGenerateRequest.setCustomParameters(
-            JsonUtil.transferToJson(
-                new HashMap<String, Object>() {
-                  {
-                    put("uid", clientProperties.getUid());
-                    put("sid", DigestUtil.md5(request.getFromUserName()));
-                  }
-                }));
-        PddDdkGoodsPromotionUrlGenerateResponse urlGenerateResponse =
-            getPddClient().syncInvoke(urlGenerateRequest);
-        if (StrUtil.equals(env, "dev")) {
-          logger.info(
-              "[{}],Request:{},Response:{}",
-              "PDD转链",
-              JsonUtil.transferToJson(urlGenerateRequest),
-              JsonUtil.transferToJson(urlGenerateResponse));
-        }
-        if (urlGenerateResponse.getGoodsPromotionUrlGenerateResponse() != null
-            && urlGenerateResponse.getGoodsPromotionUrlGenerateResponse().getGoodsPromotionUrlList()
-                != null
-            && urlGenerateResponse
-                    .getGoodsPromotionUrlGenerateResponse()
-                    .getGoodsPromotionUrlList()
-                    .size()
-                > 0) {
-          PddDdkGoodsPromotionUrlGenerateResponse
-                  .GoodsPromotionUrlGenerateResponseGoodsPromotionUrlListItem
-              urlListItem =
-                  urlGenerateResponse
-                      .getGoodsPromotionUrlGenerateResponse()
-                      .getGoodsPromotionUrlList()
-                      .get(0);
-
-          WxMessage wxMessage = new WxMessage();
-          wxMessage.setFromUserName(request.getToUserName());
-          wxMessage.setToUserName(request.getFromUserName());
-          wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-          wxMessage.setMsgType("news");
-          List<WxMessage.Articles> articlesList = new ArrayList<>();
-          if (goodsListItem.getGoodsName() != null) {
-            BigDecimal coupon = new BigDecimal(goodsListItem.getCouponDiscount().toString());
-            BigDecimal price = new BigDecimal(goodsListItem.getMinGroupPrice().toString());
-            BigDecimal priceEnd =
-                price
-                    .subtract(coupon)
-                    .divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN); // 券后价
-            BigDecimal commission =
-                priceEnd
-                    .multiply(new BigDecimal(goodsListItem.getPromotionRate()))
-                    .divide(new BigDecimal(1000), 2, RoundingMode.HALF_DOWN); // 返佣
-            BigDecimal rebate =
-                commission.multiply(new BigDecimal(clientProperties.getRate())); // 返利
-            if (StrUtil.equals(env, "dev")) {
-              logger.info(
-                  "[{}],[{}],[{}],[{}],[{}]",
-                  "PDD价格" + price.divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN),
-                  "券后价" + priceEnd,
-                  "返佣" + commission,
-                  "返利" + String.format("%.2f", rebate),
-                  urlListItem.getMobileUrl());
-            }
-            WxMessage.Articles articles = new WxMessage.Articles();
-            articles.setTitle("券后价:" + priceEnd + " 约返:" + String.format("%.2f", rebate));
-            articles.setDescription("【领券下单拿返现】" + goodsListItem.getGoodsName());
-            articles.setPicUrl(goodsListItem.getGoodsThumbnailUrl());
-            articles.setUrl(urlListItem.getMobileUrl());
-            articlesList.add(articles);
-          } else {
-            WxMessage.Articles articles = new WxMessage.Articles();
-            articles.setTitle("约返:0");
-            articles.setDescription("【点击下单】");
-            articles.setUrl(urlListItem.getMobileUrl());
-            articlesList.add(articles);
-          }
-          wxMessage.setArticles(articlesList);
-          wxMessage.setArticleCount(articlesList.size());
-          return wxMessage;
-        }
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
+    ProductQueryParam param = new ProductQueryParam();
+    param.setKeyword(request.getContent());
+    CommonPage<HJKJDProduct> page = searchProduct(param);
+    if (ObjectUtil.isNotEmpty(page.getList())) {
+      HJKJDProduct product = page.getList().get(0);
+      WxMessage wxMessage = new WxMessage();
+      wxMessage.setFromUserName(request.getToUserName());
+      wxMessage.setToUserName(request.getFromUserName());
+      wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+      wxMessage.setMsgType("text");
+      String content = "券后价:" + product.getPrice_after() + " 约返:" + product.getRebate() + "\n";
+      content = content + "◇ " + product.getGoods_name() + "\n";
+      content =
+          content
+              + String.format(
+                  "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
+                      + "data-miniprogram-path=\"pages/product/index?id=%s&sid=%s&type=1\">点我马上购买</a>",
+                  product.getGoods_id(), product.getSearchId());
+      wxMessage.setContent(content);
+      return wxMessage;
     }
     return "success";
   }
 
   @Override
-  public CommonPage<HJKJDProduct> searchProduct(PddProductQueryParam param) {
+  public CommonPage<HJKJDProduct> listProduct(ProductQueryParam param) {
     try {
-      PddDdkGoodsSearchRequest request = new PddDdkGoodsSearchRequest();
-      request.setPage(param.getPage().intValue());
-      request.setPageSize(param.getPageSize().intValue());
+      PddDdkGoodsRecommendGetRequest request = new PddDdkGoodsRecommendGetRequest();
+      request.setCatId(param.getOptId());
+      request.setChannelType(param.getChannelType());
       request.setListId(param.getListId());
-      request.setKeyword(param.getKeyword());
-      request.setOptId(param.getOptId());
-      request.setSortType(param.getSortType());
-      request.setWithCoupon(param.getWithCoupon());
+      request.setLimit(param.getPageSize().intValue());
+      request.setOffset((param.getPageSize().intValue() * param.getPage().intValue()));
       request.setPid(clientProperties.getPid());
-      PddDdkGoodsSearchResponse searchResponse = getPddClient().syncInvoke(request);
-      if (searchResponse.getGoodsSearchResponse() != null
-          && searchResponse.getGoodsSearchResponse().getGoodsList() != null
-          && searchResponse.getGoodsSearchResponse().getGoodsList().size() > 0) {
+      PddDdkGoodsRecommendGetResponse response = getPddClient().syncInvoke(request);
+      XLogger.log(
+          logger,
+          env,
+          "[{}],Request:{},Response:{}",
+          "拼夕夕商品搜索",
+          JsonUtil.transferToJson(request),
+          JsonUtil.transferToJson(response));
+
+      if (response.getGoodsBasicDetailResponse() != null
+          && response.getGoodsBasicDetailResponse().getList() != null
+          && response.getGoodsBasicDetailResponse().getList().size() > 0) {
         return CommonPage.page(
             param.getPage(),
             param.getPageSize(),
-            searchResponse.getGoodsSearchResponse().getTotalCount().longValue(),
-            searchResponse.getGoodsSearchResponse().getGoodsList().stream()
-                .flatMap(
+            response.getGoodsBasicDetailResponse().getTotal().longValue(),
+            response.getGoodsBasicDetailResponse().getList().stream()
+                .map(
                     (item) -> {
                       HJKJDProduct product = new HJKJDProduct();
                       product.setGoods_id(item.getGoodsSign());
@@ -345,42 +286,262 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       BigDecimal priceEnd =
                           price
                               .subtract(coupon)
-                              .divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN); // 券后价
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN); // 券后价
                       BigDecimal commission =
                           priceEnd
                               .multiply(new BigDecimal(item.getPromotionRate()))
-                              .divide(new BigDecimal(1000), 2, RoundingMode.HALF_DOWN); // 返佣
-                      BigDecimal rebate =
-                          commission.multiply(new BigDecimal(clientProperties.getRate())); // 返利
+                              .divide(new BigDecimal(1000), 2, RoundingMode.DOWN); // 返佣
                       product.setPrice(
                           price
-                              .divide(new BigDecimal(100), 2, RoundingMode.HALF_DOWN)
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
                               .stripTrailingZeros()
                               .toPlainString());
                       product.setPrice_after(priceEnd.stripTrailingZeros().toPlainString());
                       product.setDiscount(
                           coupon
-                              .divide(new BigDecimal(100), 0, RoundingMode.HALF_DOWN)
+                              .divide(new BigDecimal(100), 0, RoundingMode.DOWN)
                               .stripTrailingZeros()
                               .toPlainString());
-                      product.setRebate(String.format("%.2f", rebate));
+                      product.setRebate(getRebate(commission));
                       if (StrUtil.equals(env, "dev")) {
                         product.setCommissionshare(
                             new BigDecimal(item.getPromotionRate().toString())
-                                .divide(new BigDecimal("10"), 1, RoundingMode.HALF_DOWN)
+                                .divide(new BigDecimal("10"), 1, RoundingMode.DOWN)
                                 .toString());
                         product.setCommission(String.format("%.2f", commission));
                       }
                       product.setPicurl(item.getGoodsThumbnailUrl());
-                      product.setSalesTip(item.getSalesTip());
-                      return Arrays.stream(new HJKJDProduct[] {product});
+                      product.setSalesTip(
+                          String.format(
+                              "已售%s件", Optional.ofNullable(item.getSalesTip()).orElse("0")));
+                      product.setSource(ProductSource.PDD.getCode());
+                      product.setSearchId(item.getSearchId());
+                      return product;
                     })
-                .collect(Collectors.toList()));
+                .collect(Collectors.toList()),
+            response.getGoodsBasicDetailResponse().getListId());
       }
     } catch (Exception e) {
       e.printStackTrace();
       Asserts.fail(e.getLocalizedMessage());
     }
     return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
+  }
+
+  @Override
+  public CommonPage<HJKJDProduct> searchProduct(ProductQueryParam param) {
+    try {
+      PddDdkGoodsSearchRequest request = new PddDdkGoodsSearchRequest();
+      request.setPage(param.getPage().intValue());
+      request.setPageSize(param.getPageSize().intValue());
+      request.setListId(param.getListId());
+      request.setKeyword(param.getKeyword());
+      if (ObjectUtil.equals(param.getOptId(), 0)) {
+        request.setActivityTags(Collections.singletonList(10564));
+      } else if (ObjectUtil.equals(param.getOptId(), -1)) {
+        request.setActivityTags(Collections.singletonList(24));
+      } else {
+        request.setOptId(param.getOptId());
+      }
+      request.setSortType(param.getSortType());
+      request.setWithCoupon(param.getWithCoupon());
+      request.setPid(clientProperties.getPid());
+      if (ObjectUtil.isNotEmpty(param.getGoodsIds())) {
+        request.setGoodsSignList(
+            Arrays.stream(param.getGoodsIds().split(",")).collect(Collectors.toList()));
+      }
+      PddDdkGoodsSearchResponse searchResponse = getPddClient().syncInvoke(request);
+      XLogger.log(
+          logger,
+          env,
+          "[{}],Request:{},Response:{}",
+          "拼夕夕商品搜索",
+          JsonUtil.transferToJson(request),
+          JsonUtil.transferToJson(searchResponse));
+      if (searchResponse.getGoodsSearchResponse() != null
+          && searchResponse.getGoodsSearchResponse().getGoodsList() != null
+          && searchResponse.getGoodsSearchResponse().getGoodsList().size() > 0) {
+        return CommonPage.page(
+            param.getPage(),
+            param.getPageSize(),
+            searchResponse.getGoodsSearchResponse().getTotalCount().longValue(),
+            searchResponse.getGoodsSearchResponse().getGoodsList().stream()
+                .map(
+                    (item) -> {
+                      HJKJDProduct product = new HJKJDProduct();
+                      product.setGoods_id(item.getGoodsSign());
+                      product.setGoods_name(item.getGoodsName());
+                      product.setGoods_desc(item.getGoodsDesc());
+
+                      BigDecimal coupon = new BigDecimal(item.getCouponDiscount().toString());
+                      BigDecimal price = new BigDecimal(item.getMinGroupPrice().toString());
+                      BigDecimal priceEnd =
+                          price
+                              .subtract(coupon)
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN); // 券后价
+                      BigDecimal commission =
+                          priceEnd
+                              .multiply(new BigDecimal(item.getPromotionRate()))
+                              .divide(new BigDecimal(1000), 2, RoundingMode.DOWN); // 返佣
+                      product.setPrice(
+                          price
+                              .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
+                              .stripTrailingZeros()
+                              .toPlainString());
+                      product.setPrice_after(priceEnd.stripTrailingZeros().toPlainString());
+                      product.setDiscount(
+                          coupon
+                              .divide(new BigDecimal(100), 0, RoundingMode.DOWN)
+                              .stripTrailingZeros()
+                              .toPlainString());
+                      product.setRebate(getRebate(commission));
+                      if (StrUtil.equals(env, "dev")) {
+                        product.setCommissionshare(
+                            new BigDecimal(item.getPromotionRate().toString())
+                                .divide(new BigDecimal("10"), 1, RoundingMode.DOWN)
+                                .toString());
+                        product.setCommission(String.format("%.2f", commission));
+                      }
+                      product.setPicurl(item.getGoodsThumbnailUrl());
+                      product.setSalesTip(
+                          String.format(
+                              "已售%s件", Optional.ofNullable(item.getSalesTip()).orElse("0")));
+                      product.setSource(ProductSource.PDD.getCode());
+                      product.setSearchId(item.getSearchId());
+                      return product;
+                    })
+                .collect(Collectors.toList()),
+            searchResponse.getGoodsSearchResponse().getListId());
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      Asserts.fail(e.getLocalizedMessage());
+    }
+    return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
+  }
+
+  @Override
+  public HJKJDProduct getProductDetail(String id, String searchId) {
+    try {
+      PddDdkGoodsDetailRequest request = new PddDdkGoodsDetailRequest();
+      request.setGoodsImgType(0);
+      request.setGoodsSign(id);
+      request.setNeedSkuInfo(false);
+      request.setPid(clientProperties.getPid());
+      request.setSearchId(searchId);
+      PddDdkGoodsDetailResponse response = getPddClient().syncInvoke(request);
+      XLogger.log(
+          logger,
+          env,
+          "[{}],Request:{},Response:{}",
+          "拼夕夕商品详情",
+          JsonUtil.transferToJson(request),
+          JsonUtil.transferToJson(response));
+      if (response.getGoodsDetailResponse() != null
+          && ObjectUtil.isNotEmpty(response.getGoodsDetailResponse().getGoodsDetails())) {
+        PddDdkGoodsDetailResponse.GoodsDetailResponseGoodsDetailsItem item =
+            response.getGoodsDetailResponse().getGoodsDetails().get(0);
+        HJKJDProduct product = new HJKJDProduct();
+        product.setGoods_id(item.getGoodsSign());
+        product.setGoods_name(item.getGoodsName());
+        product.setGoods_desc(item.getGoodsDesc());
+
+        BigDecimal coupon = new BigDecimal(item.getCouponDiscount().toString());
+        BigDecimal price = new BigDecimal(item.getMinGroupPrice().toString());
+        BigDecimal priceEnd =
+            price.subtract(coupon).divide(new BigDecimal(100), 2, RoundingMode.DOWN); // 券后价
+        BigDecimal commission =
+            priceEnd
+                .multiply(new BigDecimal(item.getPromotionRate()))
+                .divide(new BigDecimal(1000), 2, RoundingMode.DOWN); // 返佣
+        product.setPrice(
+            price
+                .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
+                .stripTrailingZeros()
+                .toPlainString());
+        product.setPrice_after(priceEnd.stripTrailingZeros().toPlainString());
+        product.setDiscount(
+            coupon
+                .divide(new BigDecimal(100), 0, RoundingMode.DOWN)
+                .stripTrailingZeros()
+                .toPlainString());
+        product.setRebate(getRebate(commission));
+        if (StrUtil.equals(env, "dev")) {
+          product.setCommissionshare(
+              new BigDecimal(item.getPromotionRate().toString())
+                  .divide(new BigDecimal("10"), 1, RoundingMode.DOWN)
+                  .toString());
+          product.setCommission(String.format("%.2f", commission));
+        }
+        product.setPicurl(item.getGoodsThumbnailUrl());
+        product.setPicurls(String.join(",", item.getGoodsGalleryUrls()));
+        product.setSalesTip(item.getSalesTip());
+        product.setSource(ProductSource.PDD.getCode());
+        product.setSearchId(searchId);
+        product.setShopname(item.getMallName());
+        return product;
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+      Asserts.fail(e.getLocalizedMessage());
+    }
+    return null;
+  }
+
+  @Override
+  public Object getUnionUrl(String id, String searchId, String uid) {
+    try {
+      PddDdkGoodsPromotionUrlGenerateRequest request = new PddDdkGoodsPromotionUrlGenerateRequest();
+      request.setCustomParameters(
+          JsonUtil.transferToJson(
+              new HashMap<String, Object>() {
+                {
+                  put("uid", clientProperties.getUid());
+                  put("sid", uid);
+                }
+              }));
+      request.setGenerateAuthorityUrl(false);
+      request.setGenerateMallCollectCoupon(false);
+      request.setGenerateQqApp(false);
+      request.setGenerateSchemaUrl(false);
+      request.setGenerateShortUrl(true);
+      request.setGenerateWeApp(true);
+      List<String> goodsSignList = new ArrayList<>();
+      goodsSignList.add(id);
+      request.setGoodsSignList(goodsSignList);
+      request.setMultiGroup(false);
+      request.setPId(clientProperties.getPid());
+      request.setSearchId(searchId);
+      request.setGenerateShortLink(false);
+      request.setGenerateWeixinCode(true);
+      PddDdkGoodsPromotionUrlGenerateResponse response = getPddClient().syncInvoke(request);
+      XLogger.log(
+          logger,
+          env,
+          "[{}],Request:{},Response:{}",
+          "拼夕夕转链",
+          JsonUtil.transferToJson(request),
+          JsonUtil.transferToJson(response));
+
+      if (response.getGoodsPromotionUrlGenerateResponse() != null
+          && ObjectUtil.isNotEmpty(
+              response.getGoodsPromotionUrlGenerateResponse().getGoodsPromotionUrlList())) {
+        return response.getGoodsPromotionUrlGenerateResponse().getGoodsPromotionUrlList().get(0);
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    return null;
+  }
+
+  private String getRebate(BigDecimal commission) {
+    if (commission.compareTo(new BigDecimal("0.02")) < 1) {
+      return "0";
+    }
+    return commission
+        .multiply(new BigDecimal(clientProperties.getRate()))
+        .setScale(2, RoundingMode.DOWN)
+        .stripTrailingZeros()
+        .toPlainString();
   }
 }

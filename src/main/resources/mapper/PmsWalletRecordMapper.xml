@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.tencent.wxcloudrun.dao.PmsWalletRecordMapper">
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.tencent.wxcloudrun.model.PmsWalletRecord">
+        <id column="id" property="id" />
+        <result column="record_sn" property="recordSn" />
+        <result column="type" property="type" />
+        <result column="money" property="money" />
+        <result column="pay_type" property="payType" />
+        <result column="pay_account" property="payAccount" />
+        <result column="pay_status" property="payStatus" />
+        <result column="pay_time" property="payTime" />
+        <result column="create_time" property="createTime" />
+        <result column="remark" property="remark" />
+        <result column="uid" property="uid" />
+        <result column="settle_order_id" property="settleOrderId" />
+        <result column="settle_period" property="settlePeriod" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, record_sn, type, money, pay_type, pay_account, pay_status, pay_time, create_time, remark, uid, settle_order_id, settle_period
+    </sql>
+
+</mapper>

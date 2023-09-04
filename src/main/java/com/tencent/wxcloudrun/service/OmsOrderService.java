@@ -1,6 +1,9 @@
 package com.tencent.wxcloudrun.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.tencent.wxcloudrun.common.api.CommonPage;
+import com.tencent.wxcloudrun.dto.OrderDto;
+import com.tencent.wxcloudrun.dto.OrderQueryParam;
 import com.tencent.wxcloudrun.model.OmsOrder;
 
 /**
@@ -19,4 +22,5 @@ public interface OmsOrderService extends IService<OmsOrder> {
      * @param endTime   结束时间
      */
     void syncOrder(String startTime, String endTime);
+    CommonPage<OrderDto> list(OrderQueryParam param);
 }

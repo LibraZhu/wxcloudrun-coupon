@@ -3,7 +3,7 @@ package com.tencent.wxcloudrun.dto;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
-/** 订单查询参数 */
+/** 分页参数 */
 @Data
 public class PageParam {
   @ApiModelProperty(value = "每页大小")
@@ -11,4 +11,7 @@ public class PageParam {
 
   @ApiModelProperty(value = "当前页")
   private Long page = 1L;
+
+  @ApiModelProperty(value = "用户标识")
+  private String uid;
 }

@@ -28,7 +28,9 @@ taobao:
   url: https://eco.taobao.com/router/rest
   appKey: 34166008
   appSecret: 505774d570ac6116cfca3f1f94cc7d5c
+  xpid: mm_3596038134_2774850102_114599450120
   pid: 114599450120
+  rate: 0.51
 
 jd:
   serverUrl: https://api.jd.com/routerjson
@@ -39,6 +41,13 @@ jd:
   pid: "2031307306_4100960469_3100085830"
   rate: 0.51
 
+wph:
+  pid: "c28e9d647c01577a5355650daf7167d4"
+  rate: 0.51
+
+dy:
+  rate: 0.51
+
 hjk:
   apiKey: 2ec2ffab04637dfc
   apiUrl: http://api-gw.haojingke.com/index.php/v1/api
@@ -46,3 +55,10 @@ hjk:
 hdk:
   apiKey: 59623DEAE2F1
   apiUrl: http://v2.api.haodanku.com
+  apiV3Url: http://v3.api.haodanku.com
+
+jtk:
+  pubId: 133748
+  apiKey: 3GCtAAYc0YuNQNa0hyXxrnu5ZjYkbqIw
+  apiUrl: http://api.jutuike.com
+  apiActUrl: http://api.act.jutuike.com

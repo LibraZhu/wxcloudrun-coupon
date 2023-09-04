@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
  * </p>
  *
  * @author zjf
- * @since 2023年07月13日
+ * @since 2023年08月04日
  */
 @Getter
 @Setter
@@ -31,7 +31,7 @@ public class OmsOrder implements Serializable {
     private Long id;
 
     /**
-     * 来源: 1->pdd; 2->jd; 3->tb
+     * 来源: 1->pdd; 2->jd; 3->tb; 4->dy; 5->wph
      */
     @TableField("order_source")
     private Integer orderSource;
@@ -65,6 +65,12 @@ public class OmsOrder implements Serializable {
      */
     @TableField("finish_time")
     private LocalDateTime finishTime;
+
+    /**
+     * 结算时间
+     */
+    @TableField("settle_time")
+    private LocalDateTime settleTime;
 
     /**
      * 下单设备 1->pc; 2->无线
@@ -163,7 +169,7 @@ public class OmsOrder implements Serializable {
     private String actualFee;
 
     /**
-     * 订单状态
+     * 订单状态 1->待收货；2->待结算；3->已结算；4->审核失败
      */
     @TableField("status")
     private Integer status;
@@ -179,6 +185,24 @@ public class OmsOrder implements Serializable {
      */
     @TableField("position_id")
     private String positionId;
+
+    /**
+     * 订单状态描述
+     */
+    @TableField("status_des")
+    private String statusDes;
+
+    /**
+     * 返利比例
+     */
+    @TableField("rate")
+    private String rate;
+
+    /**
+     * 返利金额
+     */
+    @TableField("rebate")
+    private String rebate;
 
 
 }

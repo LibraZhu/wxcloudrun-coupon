@@ -1,14 +1,25 @@
 package com.tencent.wxcloudrun.controller;
 
+import cn.hutool.core.util.ObjectUtil;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.api.CommonResult;
-import com.tencent.wxcloudrun.dto.*;
+import com.tencent.wxcloudrun.common.api.ResultCode;
+import com.tencent.wxcloudrun.dto.HJKJDProduct;
+import com.tencent.wxcloudrun.dto.ProductDetailParam;
+import com.tencent.wxcloudrun.dto.ProductLinkParam;
+import com.tencent.wxcloudrun.dto.ProductQueryParam;
 import com.tencent.wxcloudrun.service.JDService;
-import com.tencent.wxcloudrun.service.OmsOrderService;
 import com.tencent.wxcloudrun.service.PddService;
+import com.tencent.wxcloudrun.service.ProductService;
+import com.tencent.wxcloudrun.service.UmsUserService;
+import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * 订单表 前端控制器
@@ -21,47 +32,75 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
   JDService jdService;
   PddService pddService;
-  OmsOrderService omsOrderService;
+  ProductService productService;
+  UmsUserService umsUserService;
 
   public ProductController(
       @Autowired JDService jdService,
       @Autowired PddService pddService,
-      @Autowired OmsOrderService omsOrderService) {
+      @Autowired ProductService productService,
+      @Autowired UmsUserService umsUserService) {
     this.jdService = jdService;
     this.pddService = pddService;
-    this.omsOrderService = omsOrderService;
+    this.productService = productService;
+    this.umsUserService = umsUserService;
   }
 
-  @PostMapping("/sync")
+  @ApiOperation("通过链接进行商品搜索")
+  @PostMapping("/searchLink")
   @ResponseBody
-  public CommonResult<String> sync(@RequestBody OrderSyncParam queryParam) {
-    omsOrderService.syncOrder(queryParam.getStartTime(), queryParam.getEndTime());
-    return CommonResult.success();
+  public CommonResult<List<HJKJDProduct>> searchLink(@RequestBody ProductQueryParam param) {
+    return Optional.ofNullable(productService.searchLink(param))
+        .map(CommonResult::success)
+        .orElseGet(() -> CommonResult.failed(ResultCode.NO_PRODUCT));
   }
 
-  @GetMapping("/list/jd")
+  @ApiOperation("商品搜索")
+  @PostMapping("/search")
   @ResponseBody
-  public CommonResult<CommonPage<HJKJDProduct>> list(@Validated JDProductListParam queryParam) {
-    return CommonResult.success(jdService.listProduct(queryParam));
+  public CommonResult<CommonPage<HJKJDProduct>> search(@RequestBody ProductQueryParam param) {
+    return CommonResult.success(productService.search(param));
   }
 
-  @GetMapping("/search/jd")
+  @ApiOperation("商品列表")
+  @PostMapping("/list")
   @ResponseBody
-  public CommonResult<CommonPage<HJKJDProduct>> searchJD(HJKJDProductQueryParam queryParam) {
-    return CommonResult.success(jdService.searchHJKProduct(queryParam));
+  public CommonResult<CommonPage<HJKJDProduct>> list(@RequestBody ProductQueryParam param) {
+    return CommonResult.success(productService.list(param));
   }
 
-  @GetMapping("/search/pdd")
+  @ApiOperation("商品详情")
+  @PostMapping("/detail")
   @ResponseBody
-  public CommonResult<CommonPage<HJKJDProduct>> searchPdd(PddProductQueryParam queryParam) {
-    return CommonResult.success(pddService.searchProduct(queryParam));
+  public CommonResult<HJKJDProduct> detail(
+          @RequestHeader Map<String, String> headers, @Validated @RequestBody ProductDetailParam param) {
+    String uid = param.getUid();
+    // 如果没有uid参数，先登录获取uid
+    if (ObjectUtil.isEmpty(uid)) {
+      uid = umsUserService.login(headers.get("openid"), headers.get("unionid")).getId().toString();
+      param.setUid(uid);
+    }
+    return CommonResult.success(productService.detail(param));
   }
 
-  @PostMapping("/link/jd")
+  @ApiOperation("商品转链")
+  @PostMapping("/link")
   @ResponseBody
-  public CommonResult<String> linkJD(@RequestBody ProductLinkParam queryParam) {
-    return CommonResult.success(
-        jdService.getHDKUnionUrl(
-            queryParam.getProductId(), queryParam.getCouponUrl(), queryParam.getUid()));
+  public CommonResult<Object> link(
+      @RequestHeader Map<String, String> headers, @Validated @RequestBody ProductLinkParam param) {
+    String uid = param.getUid();
+    // 如果没有uid参数，先登录获取uid
+    if (ObjectUtil.isEmpty(uid)) {
+      uid = umsUserService.login(headers.get("openid"), headers.get("unionid")).getId().toString();
+      param.setUid(uid);
+    }
+    return CommonResult.success(productService.link(param));
+  }
+
+  @ApiOperation("实时热销商品列表")
+  @PostMapping("/hotList")
+  @ResponseBody
+  public CommonResult<CommonPage<HJKJDProduct>> hotList(@RequestBody ProductQueryParam param) {
+    return CommonResult.success(productService.hotList(param));
   }
 }

@@ -25,6 +25,17 @@ public class CommonPage<T> {
     return result;
   }
 
+  public static <T> CommonPage<T> page(
+      Long page, Long pageSize, Long total, List<T> list, String listId) {
+    CommonPage<T> result = new CommonPage<T>();
+    result.setPage(page);
+    result.setPageSize(pageSize);
+    result.setTotal(total);
+    result.setList(list);
+    result.setListId(listId);
+    return result;
+  }
+
   public Long getPage() {
     return page;
   }

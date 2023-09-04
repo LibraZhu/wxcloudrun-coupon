@@ -1,9 +1,6 @@
 package com.tencent.wxcloudrun.config;
 
-import cn.hutool.core.date.DateTime;
-import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.util.ObjectUtil;
-import com.tencent.wxcloudrun.enums.OrderSource;
+import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.service.JDService;
 import com.tencent.wxcloudrun.service.PddService;
 import org.slf4j.Logger;
@@ -12,7 +9,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.SchedulingConfigurer;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
-import org.springframework.scheduling.support.CronTrigger;
 
 import javax.annotation.Resource;
 import java.util.Map;
@@ -29,7 +25,7 @@ public class ScheduledConfig implements SchedulingConfigurer {
     @Resource
     PddService pddService;
 
-    private final Map<OrderSource, String> syncTaskTimeMap = new ConcurrentHashMap<>();
+    private final Map<ProductSource, String> syncTaskTimeMap = new ConcurrentHashMap<>();
 
     @Override
     public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {

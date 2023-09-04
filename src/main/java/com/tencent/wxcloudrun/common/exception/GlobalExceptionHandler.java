@@ -52,4 +52,10 @@ public class GlobalExceptionHandler {
         }
         return CommonResult.validateFailed(message);
     }
+
+    @ResponseBody
+    @ExceptionHandler(value = Exception.class)
+    public CommonResult handle(Exception e) {
+        return CommonResult.failed("服务器异常");
+    }
 }

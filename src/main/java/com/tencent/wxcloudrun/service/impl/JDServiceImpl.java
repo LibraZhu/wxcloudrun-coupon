@@ -5,18 +5,14 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.jd.open.api.sdk.DefaultJdClient;
-import com.jd.open.api.sdk.JdClient;
-import com.jd.open.api.sdk.domain.kplunion.GoodsService.request.query.GoodsReq;
 import com.jd.open.api.sdk.domain.kplunion.GoodsService.request.query.JFGoodsReq;
 import com.jd.open.api.sdk.domain.kplunion.GoodsService.response.query.UrlInfo;
 import com.jd.open.api.sdk.domain.kplunion.OrderService.request.query.OrderRowReq;
 import com.jd.open.api.sdk.request.kplunion.UnionOpenGoodsJingfenQueryRequest;
-import com.jd.open.api.sdk.request.kplunion.UnionOpenGoodsQueryRequest;
 import com.jd.open.api.sdk.request.kplunion.UnionOpenOrderRowQueryRequest;
 import com.jd.open.api.sdk.response.kplunion.UnionOpenGoodsJingfenQueryResponse;
-import com.jd.open.api.sdk.response.kplunion.UnionOpenGoodsQueryResponse;
 import com.jd.open.api.sdk.response.kplunion.UnionOpenOrderRowQueryResponse;
-import com.pdd.pop.sdk.common.util.DigestUtil;
+import com.pdd.pop.ext.fasterxml.jackson.core.type.TypeReference;
 import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
@@ -25,10 +21,12 @@ import com.tencent.wxcloudrun.config.properties.HJKProperties;
 import com.tencent.wxcloudrun.config.properties.JDProperties;
 import com.tencent.wxcloudrun.dao.OmsOrderMapper;
 import com.tencent.wxcloudrun.dto.*;
-import com.tencent.wxcloudrun.enums.OrderSource;
+import com.tencent.wxcloudrun.enums.OrderStatus;
+import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.JDService;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
+import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,7 +43,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -60,6 +61,38 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   @Value("${spring.profiles.active}")
   private String env;
+
+  private final Map<Integer, String> statusMap =
+      new HashMap<Integer, String>() {
+        {
+          put(-1, "未知");
+          put(2, "无效-拆单");
+          put(3, "无效-取消  ");
+          put(4, "无效-京东帮帮主订单");
+          put(5, "无效-账号异常");
+          put(6, "无效-赠品类目不返佣");
+          put(7, "无效-赠品类目不返佣");
+          put(8, "无效-企业订单");
+          put(9, "无效-团购订单");
+          put(11, "无效-乡村推广员下单");
+          put(13, "违规订单-其他");
+          put(14, "无效-来源与备案网址不符,");
+          put(15, "待付款");
+          put(19, "无效-佣金比例为0");
+          put(20, "无效-此复购订单对应的首购订单无效");
+          put(21, "无效-云店订单");
+          put(22, "无效-PLUS会员佣金比例为0");
+          put(23, "无效-支付有礼");
+          put(24, "已付定金");
+          put(25, "违规订单-流量劫持");
+          put(26, "违规订单-流量异常");
+          put(27, "违规订单-违反京东平台规则");
+          put(28, "违规订单-多笔交易异常");
+          put(29, "无效-跨屏跨店");
+          put(30, "无效-累计件数超出类目上限");
+          put(31, "无效-黑名单sku");
+        }
+      };
 
   private DefaultJdClient getJDClient() {
     return new DefaultJdClient(
@@ -102,23 +135,24 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       orderReq.setPageIndex(page);
       orderReq.setStartTime(startTime);
       orderReq.setEndTime(endTime);
+      orderReq.setFields("goodsInfo");
       orderRowQueryRequest.setOrderReq(orderReq);
       orderRowQueryRequest.setVersion("1.0");
       UnionOpenOrderRowQueryResponse response = getJDClient().execute(orderRowQueryRequest);
-      if (StrUtil.equals(env, "dev")) {
-        logger.info(
-            "Method:[{}],Request:{},Response:{}",
-            "SyncJDOrder",
-            JsonUtil.transferToJson(orderReq),
-            JsonUtil.transferToJson(response));
-      }
+      XLogger.log(
+          logger,
+          env,
+          "Method:[{}],Request:{},Response:{}",
+          "SyncJDOrder",
+          JsonUtil.transferToJson(orderReq),
+          JsonUtil.transferToJson(response));
       if (response.getQueryResult() != null && response.getQueryResult().getData() != null) {
         List<OmsOrder> list =
             Arrays.stream(response.getQueryResult().getData())
-                .flatMap(
+                .map(
                     (item) -> {
                       OmsOrder order = new OmsOrder();
-                      order.setOrderSource(OrderSource.JD.getCode());
+                      order.setOrderSource(ProductSource.JD.getCode());
                       order.setOrderId(item.getOrderId().toString());
                       order.setOrderSn(item.getId());
                       order.setOrderEmt(item.getOrderEmt());
@@ -156,17 +190,39 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       order.setActualCosPrice(item.getActualCosPrice().toString());
                       order.setActualFee(item.getActualFee().toString());
                       order.setStatus(item.getValidCode());
+                      if (item.getValidCode() == 16) {
+                        order.setStatus(OrderStatus.DELIVER.getCode());
+                      } else if (item.getValidCode() == 17) {
+                        order.setStatus(OrderStatus.COMPLETE.getCode());
+                      } else {
+                        order.setStatus(OrderStatus.INVALID.getCode());
+                        order.setStatusDes(
+                            order.getStatus() + "-" + statusMap.get(order.getStatus()));
+                      }
                       order.setUid(item.getSubUnionId());
-                      return Arrays.stream(new OmsOrder[] {order});
+                      order.setRate(jdProperties.getRate());
+                      // 金额小于0.02不算返利
+                      order.setRebate(
+                          item.getActualFee() >= 0.02
+                              ? new BigDecimal(order.getActualFee())
+                                  .multiply(new BigDecimal(order.getRate()))
+                                  .setScale(2, RoundingMode.DOWN)
+                                  .toString()
+                              : "0.00");
+                      return order;
                     })
                 .collect(Collectors.toList());
         if (list.size() > 0) {
           baseMapper.saveOrUpdateList(list);
         }
-        if (StrUtil.equals(env, "dev")) {
-          logger.info(
-              "同步订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.transferToJson(list));
-        }
+        XLogger.log(
+            logger,
+            env,
+            "同步京东订单:[{}~{}],第{}页,{}",
+            startTime,
+            endTime,
+            page,
+            JsonUtil.transferToJson(list));
         if (response.getQueryResult() != null && response.getQueryResult().getHasMore()) {
           // 是否还有更多
           try {
@@ -195,46 +251,18 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         wxMessage.setFromUserName(request.getToUserName());
         wxMessage.setToUserName(request.getFromUserName());
         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("news");
-        wxMessage.setArticleCount(1);
-        List<WxMessage.Articles> articlesList = new ArrayList<>();
-        WxMessage.Articles articles = new WxMessage.Articles();
-        BigDecimal rebate =
-            new BigDecimal(productDetail.getCommission())
-                .multiply(new BigDecimal(jdProperties.getRate()));
-
-        if (productDetail.getPlusCommissionShare() != null) {
-          rebate =
-              rebate.multiply(
-                  new BigDecimal(productDetail.getPlusCommissionShare())
-                      .divide(
-                          new BigDecimal(productDetail.getCommissionshare()),
-                          2,
-                          RoundingMode.HALF_DOWN));
-        }
-        String rebateStr =
-            rebate.setScale(2, RoundingMode.HALF_DOWN).stripTrailingZeros().toPlainString();
-        articles.setTitle("券后价:" + productDetail.getPrice_after() + " 约返:" + rebateStr);
-        articles.setDescription("【领券下单拿返现】" + productDetail.getGoods_name());
-        articles.setPicUrl(productDetail.getPicurl().replace("/jfs", "/s200x200_jfs"));
-        String unionUrl =
-            getHDKUnionUrl(
-                id, productDetail.getCouponurl(), DigestUtil.md5(request.getFromUserName()));
-        if (StrUtil.equals(env, "dev")) {
-          logger.info(
-              "[{}],[{}],[{}],[{}],[{}]",
-              "JD价格" + productDetail.getPrice(),
-              "券后价" + productDetail.getPrice_after(),
-              "返佣" + productDetail.getCommission(),
-              "返利" + rebateStr,
-              unionUrl);
-        }
-        if (unionUrl != null) {
-          articles.setUrl(unionUrl);
-          articlesList.add(articles);
-          wxMessage.setArticles(articlesList);
-          return wxMessage;
-        }
+        wxMessage.setMsgType("text");
+        String content =
+            "券后价:" + productDetail.getPrice_after() + " 约返:" + productDetail.getRebate() + "\n";
+        content = content + "◇ " + productDetail.getGoods_name() + "\n";
+        content =
+            content
+                + String.format(
+                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
+                        + "data-miniprogram-path=\"pages/product/index?id=%s&type=2\">点我马上购买</a>",
+                    productDetail.getGoods_id());
+        wxMessage.setContent(content);
+        return wxMessage;
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -243,27 +271,37 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public CommonPage<HJKJDProduct> listProduct(JDProductListParam param) {
+  public CommonPage<HJKJDProduct> listProduct(ProductQueryParam param) {
     try {
       UnionOpenGoodsJingfenQueryRequest request = new UnionOpenGoodsJingfenQueryRequest();
       JFGoodsReq goodsReq = new JFGoodsReq();
-      goodsReq.setEliteId(param.getEliteId());
+      goodsReq.setEliteId(param.getOptId().intValue());
       goodsReq.setPageIndex(param.getPage().intValue());
       goodsReq.setPageSize(param.getPageSize().intValue());
-      goodsReq.setSortName(param.getSortName());
-      goodsReq.setSort(param.getSort());
+      if (param.getSortType() == 5) {
+        goodsReq.setSortName("inOrderCount30DaysSku");
+        goodsReq.setSort("asc");
+      } else if (param.getSortType() == 6) {
+        goodsReq.setSortName("inOrderCount30DaysSku");
+        goodsReq.setSort("desc");
+      } else if (param.getSortType() == 9) {
+        goodsReq.setSortName("price");
+        goodsReq.setSort("asc");
+      } else if (param.getSortType() == 10) {
+        goodsReq.setSortName("price");
+        goodsReq.setSort("desc");
+      }
       goodsReq.setPid(jdProperties.getPid());
       request.setGoodsReq(goodsReq);
       request.setVersion("1.0");
       UnionOpenGoodsJingfenQueryResponse response = getJDClient().execute(request);
-      logger.info(
+      XLogger.log(
+          logger,
+          env,
           "[{}],Request:{},Response:{}",
-          "京粉商品列表",
+          "京东商品列表",
           JsonUtil.transferToJson(request),
           JsonUtil.transferToJson(response));
-      if (response == null || response.getQueryResult() == null) {
-        Asserts.fail("请求异常");
-      }
       if (response.getQueryResult().getCode() != 200) {
         Asserts.fail(response.getQueryResult().getMessage());
       }
@@ -274,7 +312,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             param.getPageSize(),
             response.getQueryResult().getTotalCount(),
             Arrays.stream(response.getQueryResult().getData())
-                .flatMap(
+                .map(
                     (item) -> {
                       HJKJDProduct product = new HJKJDProduct();
                       product.setGoods_id(item.getSkuId().toString());
@@ -305,6 +343,18 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                               .map(UrlInfo::getUrl)
                               .collect(Collectors.joining(",")));
                       product.setSales(item.getInOrderCount30DaysSku());
+                      if (item.getInOrderCount30DaysSku() >= 10000) {
+                        product.setSalesTip(
+                            String.format(
+                                "月售%s万+件",
+                                new BigDecimal(item.getInOrderCount30DaysSku())
+                                    .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
+                                    .stripTrailingZeros()
+                                    .toPlainString()));
+                      } else {
+                        product.setSalesTip(
+                            String.format("月售%s件", item.getInOrderCount30DaysSku()));
+                      }
                       product.setIspg(
                           item.getPinGouInfo() != null
                                   && item.getPinGouInfo().getPingouTmCount() != null
@@ -323,34 +373,23 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                           product.setCommissionshare(
                               item.getCommissionInfo().getCommissionShare().toString());
                           product.setPlusCommissionShare(
-                              item.getCommissionInfo().getPlusCommissionShare().toString());
-                        }
-                        BigDecimal rebate =
-                            new BigDecimal(
-                                    item.getCommissionInfo().getCouponCommission().toString())
-                                .multiply(new BigDecimal(jdProperties.getRate()));
-                        if (item.getCommissionInfo().getPlusCommissionShare() != null) {
-                          rebate =
-                              rebate.multiply(
-                                  new BigDecimal(
-                                          item.getCommissionInfo()
-                                              .getPlusCommissionShare()
-                                              .toString())
-                                      .divide(
-                                          new BigDecimal(
-                                              item.getCommissionInfo()
-                                                  .getCommissionShare()
-                                                  .toString()),
-                                          2,
-                                          RoundingMode.HALF_DOWN));
+                              item.getCommissionInfo().getPlusCommissionShare() == null
+                                  ? null
+                                  : item.getCommissionInfo().getPlusCommissionShare().toString());
                         }
                         product.setRebate(
-                            rebate
-                                .setScale(2, RoundingMode.HALF_DOWN)
-                                .stripTrailingZeros()
-                                .toPlainString());
+                            getRebate(
+                                item.getCommissionInfo().getCouponCommission().toString(),
+                                item.getCommissionInfo().getCommissionShare().toString(),
+                                item.getCommissionInfo().getPlusCommissionShare() == null
+                                    ? null
+                                    : item.getCommissionInfo()
+                                        .getPlusCommissionShare()
+                                        .toString()));
                       }
-                      return Arrays.stream(new HJKJDProduct[] {product});
+                      product.setOwner(item.getOwner());
+                      product.setSource(ProductSource.JD.getCode());
+                      return product;
                     })
                 .collect(Collectors.toList()));
       }
@@ -362,7 +401,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public CommonPage<HJKJDProduct> searchHJKProduct(HJKJDProductQueryParam param) {
+  public CommonPage<HJKJDProduct> searchHJKProduct(ProductQueryParam param) {
     String api = hjkProperties.getApiUrl() + "/jd/goodslist";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
@@ -371,54 +410,77 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             put("pageindex", param.getPage());
             put("pagesize", param.getPageSize());
             put("keyword", param.getKeyword());
-            put("sortName", param.getSortName());
-            put("sort", param.getSort());
-            put("owner", param.getOwner());
+            put("goods_ids", param.getGoodsIds());
           }
         };
-    HJKJDProductListResponse hjkjdProductListResponse =
-        RestTemplateUtil.getInstance()
-            .postForObject(api, searchParams, HJKJDProductListResponse.class);
-    if (StrUtil.equals(env, "dev")) {
-      logger.info(
-          "[{}],Request:{},Response:{}",
-          "hjk京东商品列表",
-          JsonUtil.transferToJson(searchParams),
-          JsonUtil.transferToJson(hjkjdProductListResponse));
+
+    if (param.getSortType() == 5) {
+      searchParams.put("sortname", "4");
+      searchParams.put("sort", "asc");
+    } else if (param.getSortType() == 6) {
+      searchParams.put("sortname", "4");
+      searchParams.put("sort", "desc");
+    } else if (param.getSortType() == 9) {
+      searchParams.put("sortname", "1");
+      searchParams.put("sort", "asc");
+    } else if (param.getSortType() == 10) {
+      searchParams.put("sortname", "1");
+      searchParams.put("sort", "desc");
     }
+    HJKProductListResponse hjkjdProductListResponse =
+        RestTemplateUtil.getInstance()
+            .postForObject(api, searchParams, HJKProductListResponse.class);
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "hjk京东商品列表",
+        JsonUtil.transferToJson(searchParams),
+        JsonUtil.transferToJson(hjkjdProductListResponse));
     if (hjkjdProductListResponse == null) {
       Asserts.fail("服务器异常");
     }
     if (hjkjdProductListResponse.getStatus_code() != 200) {
       Asserts.fail(hjkjdProductListResponse.getMessage());
     }
-    // 计算返利
-    hjkjdProductListResponse
-        .getData()
-        .getData()
-        .forEach(
-            product -> {
-              BigDecimal rebate =
-                  new BigDecimal(product.getCommission())
-                      .multiply(new BigDecimal(jdProperties.getRate()));
-              if (product.getPlusCommissionShare() != null) {
-                rebate =
-                    rebate.multiply(
-                        new BigDecimal(product.getPlusCommissionShare())
-                            .divide(
-                                new BigDecimal(product.getCommissionshare()),
-                                2,
-                                RoundingMode.HALF_DOWN));
-              }
-              product.setRebate(
-                  rebate.setScale(2, RoundingMode.HALF_DOWN).stripTrailingZeros().toPlainString());
-            });
-
-    return CommonPage.page(
-        param.getPage(),
-        param.getPageSize(),
-        hjkjdProductListResponse.getData().getTotal(),
-        hjkjdProductListResponse.getData().getData());
+    if (hjkjdProductListResponse.getData().getData() instanceof List) {
+      List<HJKJDProduct> list =
+          JsonUtil.transferToObj(
+              JsonUtil.transferToJson(hjkjdProductListResponse.getData().getData()),
+              new TypeReference<List<HJKJDProduct>>() {});
+      // 计算返利
+      list.forEach(
+          product -> {
+            product.setRebate(
+                getRebate(
+                    product.getCommission(),
+                    product.getCommissionshare(),
+                    product.getPlusCommissionShare()));
+            product.setSource(ProductSource.JD.getCode());
+            if (product.getSales() >= 10000) {
+              product.setSalesTip(
+                  String.format(
+                      "月售%s万+件",
+                      new BigDecimal(product.getSales())
+                          .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
+                          .stripTrailingZeros()
+                          .toPlainString()));
+            } else {
+              product.setSalesTip(String.format("月售%s件", product.getSales()));
+            }
+          });
+      return CommonPage.page(
+          param.getPage(),
+          param.getPageSize(),
+          hjkjdProductListResponse.getData().getTotal(),
+          list);
+    } else {
+      return CommonPage.page(
+          param.getPage(),
+          param.getPageSize(),
+          hjkjdProductListResponse.getData().getTotal(),
+          null);
+    }
   }
 
   @Override
@@ -435,64 +497,41 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     ResponseEntity<HJKJDProductDetailResponse> detailResponseEntity =
         RestTemplateUtil.getInstance()
             .postForEntity(api, searchParams, HJKJDProductDetailResponse.class);
-    if (StrUtil.equals(env, "dev")) {
-      logger.info(
-          "[{}],Request:{},Response:{}",
-          "hjk京东商品详情",
-          JsonUtil.transferToJson(searchParams),
-          JsonUtil.transferToJson(detailResponseEntity));
-    }
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "hjk京东商品详情",
+        JsonUtil.transferToJson(searchParams),
+        JsonUtil.transferToJson(detailResponseEntity));
     if (detailResponseEntity.getBody() != null
         && detailResponseEntity.getBody().getData() != null) {
       // 计算返利
       HJKJDProduct product = detailResponseEntity.getBody().getData();
-      BigDecimal rebate =
-          new BigDecimal(product.getCommission()).multiply(new BigDecimal(jdProperties.getRate()));
-      if (product.getPlusCommissionShare() != null) {
-        rebate =
-            rebate.multiply(
-                new BigDecimal(product.getPlusCommissionShare())
-                    .divide(
-                        new BigDecimal(product.getCommissionshare()), 2, RoundingMode.HALF_DOWN));
-      }
       product.setRebate(
-          rebate.setScale(2, RoundingMode.HALF_DOWN).stripTrailingZeros().toPlainString());
+          getRebate(
+              product.getCommission(),
+              product.getCommissionshare(),
+              product.getPlusCommissionShare()));
+      product.setSource(ProductSource.JD.getCode());
+      if (product.getSales() >= 10000) {
+        product.setSalesTip(
+            String.format(
+                "月售%s万+件",
+                new BigDecimal(product.getSales())
+                    .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
+                    .stripTrailingZeros()
+                    .toPlainString()));
+      } else {
+        product.setSalesTip(String.format("月售%s件", product.getSales()));
+      }
       return product;
     }
     return null;
   }
 
   @Override
-  public String getHJKUnionUrl(String id) {
-    // 获取推广链接
-    String hjkApi = hjkProperties.getApiUrl() + "/jd/getunionurl";
-    Map<String, Object> map =
-        new HashMap<String, Object>() {
-          {
-            put("apikey", hjkProperties.getApiKey());
-            put("goods_id", Long.valueOf(id));
-            put("positionid", jdProperties.getPositionId());
-            put("type", 1);
-            put("giftCouponKey", "");
-          }
-        };
-    ResponseEntity<HJKJDProductLinkResponse> productLinkResponse =
-        RestTemplateUtil.getInstance().postForEntity(hjkApi, map, HJKJDProductLinkResponse.class);
-    if (StrUtil.equals(env, "dev")) {
-      logger.info(
-          "[{}],Request:{},Response:{}",
-          "hjk京东转链",
-          JsonUtil.transferToJson(map),
-          JsonUtil.transferToJson(productLinkResponse));
-    }
-    if (productLinkResponse.getBody() != null && productLinkResponse.getBody().getData() != null) {
-      return productLinkResponse.getBody().getData();
-    }
-    return null;
-  }
-
-  @Override
-  public String getHDKUnionUrl(String id, String coupon_url, String subUnionId) {
+  public String getHDKUnionUrl(String id, String coupon_url, String uid) {
     // 获取推广链接
     String hdkApi = hdkProperties.getApiUrl() + "/get_jditems_link";
     MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
@@ -506,41 +545,44 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     map.add("coupon_url", coupon_url);
     map.add("union_id", jdProperties.getUnionId());
     map.add("pid", jdProperties.getPid());
-    map.add("subUnionId", subUnionId);
+    map.add("subUnionId", uid);
     HttpHeaders httpHeaders = new HttpHeaders();
     httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
     HttpEntity<MultiValueMap<String, Object>> param = new HttpEntity<>(map, httpHeaders);
     HDKJDProductLinkResponse productLinkResponse =
         RestTemplateUtil.getInstance().postForObject(hdkApi, param, HDKJDProductLinkResponse.class);
-    if (StrUtil.equals(env, "dev")) {
-      logger.info(
-          "[{}],Request:{},Response:{}",
-          "hdk京东转链",
-          JsonUtil.transferToJson(map),
-          JsonUtil.transferToJson(productLinkResponse));
-    }
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "hdk京东转链",
+        JsonUtil.transferToJson(map),
+        JsonUtil.transferToJson(productLinkResponse));
     if (productLinkResponse != null && productLinkResponse.getData() != null) {
       return productLinkResponse.getData().getShort_url();
     }
     return null;
   }
 
-  public static void main(String[] args) {
-    JdClient client =
-        new DefaultJdClient(
-            "https://api.jd.com/routerjson",
-            null,
-            "fd07e7373553e152016b787fba46c182",
-            "eaf58fbf234c406186632d3dcf17771a");
-    UnionOpenGoodsQueryRequest request = new UnionOpenGoodsQueryRequest();
-    GoodsReq goodsReqDTO = new GoodsReq();
-    request.setGoodsReqDTO(goodsReqDTO);
-    request.setVersion("1.0");
-    try {
-      UnionOpenGoodsQueryResponse response = client.execute(request);
-      System.out.println(JsonUtil.transferToJson(response));
-    } catch (Exception e) {
-      e.printStackTrace();
+  /**
+   * 获取返利金额
+   *
+   * @param commission 预估佣金
+   * @param commissionShare 佣金比例
+   * @param plusCommissionShare plus佣金比例，plus用户购买推广者能获取到的佣金比例
+   * @return 返利金额
+   */
+  private String getRebate(String commission, String commissionShare, String plusCommissionShare) {
+    if (new BigDecimal(commission).compareTo(new BigDecimal("0.02")) < 1) {
+      return "0";
     }
+    BigDecimal rebate = new BigDecimal(commission).multiply(new BigDecimal(jdProperties.getRate()));
+    if (ObjectUtil.isNotEmpty(plusCommissionShare)) {
+      rebate =
+          rebate.multiply(
+              new BigDecimal(plusCommissionShare)
+                  .divide(new BigDecimal(commissionShare), 2, RoundingMode.DOWN));
+    }
+    return rebate.setScale(2, RoundingMode.DOWN).stripTrailingZeros().toPlainString();
   }
 }
