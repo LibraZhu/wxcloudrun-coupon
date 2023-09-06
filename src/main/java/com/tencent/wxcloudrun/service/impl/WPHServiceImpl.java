@@ -347,7 +347,7 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
     }
     if (response.getData() instanceof Map) {
       List goodInfoList = (List) ((Map<?, ?>) response.getData()).get("goodsInfoList");
-      Long total = (Long) ((Map<?, ?>) response.getData()).get("total");
+      Integer total = (Integer) ((Map<?, ?>) response.getData()).get("total");
 
       if (ObjectUtil.isNotEmpty(goodInfoList)) {
         List<HJKWPHProduct> list =
@@ -356,7 +356,7 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         return CommonPage.page(
             param.getPage(),
             param.getPageSize(),
-            total,
+            total.longValue(),
             list.stream()
                 .map(
                     item -> {

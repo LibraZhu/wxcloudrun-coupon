@@ -2,7 +2,6 @@ package com.tencent.wxcloudrun.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.pdd.pop.sdk.common.util.JsonUtil;
@@ -66,26 +65,27 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
 
   @Override
   public UmsUser login(String openid, String unionid) {
-    logger.info("[{}],openid:{},unionid:{}", "登录", openid, unionid);
     if (ObjectUtil.isEmpty(openid)) {
+      logger.info("[{}],openid:{},unionid:{}", "登录", openid, unionid);
       Asserts.fail("openid不能为空");
     }
-    try{
-      UmsUser umsUser = lambdaQuery().eq(UmsUser::getOpenid,openid).one();
+    try {
+      UmsUser umsUser = lambdaQuery().eq(UmsUser::getOpenid, openid).one();
       if (umsUser == null) {
         umsUser = new UmsUser();
         umsUser.setOpenid(openid);
         umsUser.setUnionid(unionid);
         baseMapper.insert(umsUser);
         //
-        pmsWalletService.add(Long.valueOf(umsUser.getId()));
+        pmsWalletService.add(umsUser.getId());
       } else {
         if (ObjectUtil.isNotEmpty(unionid)) {
           baseMapper.updateById(umsUser);
         }
       }
+      logger.info("[{}],uid:{},openid:{},unionid:{}", "登录", umsUser.getId(), openid, unionid);
       return umsUser;
-    }catch (Exception e){
+    } catch (Exception e) {
       e.printStackTrace();
     }
     return null;
