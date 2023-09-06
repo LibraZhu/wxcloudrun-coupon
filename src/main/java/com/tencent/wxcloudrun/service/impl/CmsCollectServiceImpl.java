@@ -11,10 +11,8 @@ import com.tencent.wxcloudrun.dto.CollectParam;
 import com.tencent.wxcloudrun.dto.HJKJDProduct;
 import com.tencent.wxcloudrun.model.CmsCollect;
 import com.tencent.wxcloudrun.service.CmsCollectService;
-import com.tencent.wxcloudrun.service.ProductService;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.util.stream.Collectors;
 
 /**
@@ -26,7 +24,6 @@ import java.util.stream.Collectors;
 @Service
 public class CmsCollectServiceImpl extends ServiceImpl<CmsCollectMapper, CmsCollect>
     implements CmsCollectService {
-  @Resource ProductService productService;
 
   @Override
   public Boolean check(CollectParam request) {

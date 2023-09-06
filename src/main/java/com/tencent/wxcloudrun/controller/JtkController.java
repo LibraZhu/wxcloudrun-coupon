@@ -1,7 +1,7 @@
 package com.tencent.wxcloudrun.controller;
 
 import com.tencent.wxcloudrun.common.api.CommonResult;
-import com.tencent.wxcloudrun.service.WMService;
+import com.tencent.wxcloudrun.service.JTKService;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -13,11 +13,11 @@ import org.springframework.web.bind.annotation.*;
  * @since 2023年07月11日
  */
 @RestController
-@RequestMapping("/wm")
-public class WmController {
-  WMService wmService;
+@RequestMapping("/jtk")
+public class JtkController {
+  JTKService wmService;
 
-  public WmController(@Autowired WMService wmService) {
+  public JtkController(@Autowired JTKService wmService) {
     this.wmService = wmService;
   }
 
@@ -34,5 +34,12 @@ public class WmController {
   @ResponseBody
   public CommonResult<Object> ele(@RequestParam Integer type) {
     return CommonResult.success(wmService.getEleLink(type));
+  }
+
+  @ApiOperation("统一活动转链接口。0-滴滴打车；1-T3; 2-花小猪")
+  @GetMapping("/unionLink")
+  @ResponseBody
+  public CommonResult<Object> unionLink(@RequestParam Integer type) {
+    return CommonResult.success(wmService.getUnionLink(type));
   }
 }
