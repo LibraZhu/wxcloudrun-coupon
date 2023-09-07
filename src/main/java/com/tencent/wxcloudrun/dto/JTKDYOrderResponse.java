@@ -17,7 +17,7 @@ public class JTKDYOrderResponse {
   private String msg;
 
   @JsonProperty("data")
-  private DataDTO data;
+  private Object data;
 
   @NoArgsConstructor
   @Data

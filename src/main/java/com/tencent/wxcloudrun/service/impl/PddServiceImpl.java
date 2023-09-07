@@ -85,15 +85,17 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
     }
     String oneHourEndTime =
         DateUtil.formatDateTime(DateUtil.offsetHour(DateUtil.parseDateTime(startTime), 1));
-    syncOrderPage(1, startTime, oneHourEndTime);
     // 如果一个小时后时间在结束时间之前，继续查询
     if (DateUtil.parseDateTime(oneHourEndTime).isBefore(DateUtil.parseDateTime(endTime))) {
+      syncOrderPage(1, startTime, oneHourEndTime);
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
       syncOrder(oneHourEndTime, endTime);
+    } else {
+      syncOrderPage(1, startTime, endTime);
     }
   }
 
@@ -120,10 +122,10 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           JsonUtil.transferToJson(request),
           JsonUtil.transferToJson(response));
       if (response.getOrderListGetResponse() != null
-          && response.getOrderListGetResponse().getOrderList() != null) {
+          && ObjectUtil.isNotEmpty(response.getOrderListGetResponse().getOrderList())) {
         List<OmsOrder> list =
             response.getOrderListGetResponse().getOrderList().stream()
-                .flatMap(
+                .map(
                     (item) -> {
                       OmsOrder order = new OmsOrder();
                       order.setOrderSource(ProductSource.PDD.getCode());
@@ -145,6 +147,12 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                         order.setModifyTime(
                             LocalDateTime.ofInstant(
                                 Instant.ofEpochSecond(item.getOrderModifyAt()),
+                                ZoneId.systemDefault()));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getOrderSettleTime())) {
+                        order.setSettleTime(
+                            LocalDateTime.ofInstant(
+                                Instant.ofEpochSecond(item.getOrderSettleTime()),
                                 ZoneId.systemDefault()));
                       }
                       order.setCompared(item.getPriceCompareStatus());
@@ -194,7 +202,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                                   .stripTrailingZeros()
                                   .toPlainString()
                               : "0.00");
-                      return Arrays.stream(new OmsOrder[] {order});
+                      return order;
                     })
                 .collect(Collectors.toList());
         XLogger.log(

@@ -59,15 +59,17 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
     }
     String oneHourEndTime =
         DateUtil.formatDateTime(DateUtil.offsetHour(DateUtil.parseDateTime(startTime), 1));
-    syncOrderPage(1, startTime, oneHourEndTime);
     // 如果一个小时后时间在结束时间之前，继续查询
     if (DateUtil.parseDateTime(oneHourEndTime).isBefore(DateUtil.parseDateTime(endTime))) {
+      syncOrderPage(1, startTime, oneHourEndTime);
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
       syncOrder(oneHourEndTime, endTime);
+    } else {
+      syncOrderPage(1, startTime, endTime);
     }
   }
 
@@ -90,8 +92,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           }
         };
 
-    HJKOrderResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, searchParams, HJKOrderResponse.class);
+    HJKWPHOrderResponse response =
+        RestTemplateUtil.getInstance().postForObject(api, searchParams, HJKWPHOrderResponse.class);
     XLogger.log(
         logger,
         env,
@@ -108,6 +110,9 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           JsonUtil.transferToObj(
               JsonUtil.transferToJson(response.getData().getOrderInfoList()),
               new TypeReference<List<HJKWPHOrder>>() {});
+      if (ObjectUtil.isEmpty(orderList)) {
+        return;
+      }
       List<OmsOrder> list =
           orderList.stream()
               .map(
@@ -133,6 +138,11 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                               Instant.ofEpochMilli(item.getLastUpdateTime()),
                               ZoneId.systemDefault()));
                     }
+                    if (ObjectUtil.isNotEmpty(item.getSettledTime())) {
+                      order.setSettleTime(
+                          LocalDateTime.ofInstant(
+                              Instant.ofEpochMilli(item.getSettledTime()), ZoneId.systemDefault()));
+                    }
                     order.setPid(item.getPid());
                     HJKWPHOrder.DetailListDTO detail = item.getDetailList().get(0);
                     order.setSkuId(detail.getGoodsId());
@@ -149,8 +159,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       order.setStatus(OrderStatus.COMPLETE.getCode());
                     } else if (ObjectUtil.equals(item.getOrderSubStatusName(), "已失效")) {
                       order.setStatus(OrderStatus.INVALID.getCode());
+                      order.setStatusDes(item.getOrderSubStatusName());
                     }
-                    order.setStatusDes(item.getOrderSubStatusName());
                     order.setUid(item.getStatParam());
                     order.setRate(wphProperties.getRate());
                     // 金额小于0.02不算返利
@@ -203,8 +213,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         content =
             content
                 + String.format(
-                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" " +
-                            "data-miniprogram-path=\"pages/product/index?id=%s&type=5\">点我马上购买</a>",
+                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
+                        + "data-miniprogram-path=\"pages/product/index?id=%s&type=5\">点我马上购买</a>",
                     product.getGoods_id());
         wxMessage.setContent(content);
         return wxMessage;

@@ -55,15 +55,17 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     }
     String oneHourEndTime =
         DateUtil.formatDateTime(DateUtil.offsetHour(DateUtil.parseDateTime(startTime), 1));
-    syncOrderPage(1, startTime, oneHourEndTime);
     // 如果一个小时后时间在结束时间之前，继续查询
     if (DateUtil.parseDateTime(oneHourEndTime).isBefore(DateUtil.parseDateTime(endTime))) {
+      syncOrderPage(1, startTime, oneHourEndTime);
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
       syncOrder(oneHourEndTime, endTime);
+    } else {
+      syncOrderPage(1, startTime, endTime);
     }
   }
 
@@ -95,95 +97,99 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         "SyncDYOrder",
         JsonUtil.transferToJson(searchParams),
         JsonUtil.transferToJson(response));
-    if (response == null) {
+    if (response == null || response.getData() == null) {
       return;
     }
-    if (ObjectUtil.isNotNull(response.getData())
-        && ObjectUtil.isNotEmpty(response.getData().getData())) {
-      List<OmsOrder> list =
-          response.getData().getData().stream()
-              .map(
-                  (item) -> {
-                    OmsOrder order = new OmsOrder();
-                    order.setOrderSource(ProductSource.DY.getCode());
-                    order.setOrderId(item.getOrderId());
-                    order.setOrderSn(item.getOrderId());
-                    order.setOrderEmt(2);
-                    if (ObjectUtil.isNotEmpty(item.getPaySuccessTime())) {
-                      order.setOrderTime(
-                          LocalDateTime.parse(
-                              item.getPaySuccessTime(),
-                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    }
-                    if (ObjectUtil.isNotEmpty(item.getUpdateTime())
-                        && ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
-                      order.setFinishTime(
-                          LocalDateTime.parse(
-                              item.getUpdateTime(),
-                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    }
-                    if (ObjectUtil.isNotEmpty(item.getUpdateTime())) {
-                      order.setModifyTime(
-                          LocalDateTime.parse(
-                              item.getUpdateTime(),
-                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    }
-                    if (ObjectUtil.isNotEmpty(item.getSettleTime())) {
-                      order.setSettleTime(
-                          LocalDateTime.parse(
-                              item.getSettleTime(),
-                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                    }
-                    order.setSkuId(item.getProductId());
-                    order.setSkuName(item.getProductName());
-                    order.setSkuNum(Long.valueOf(item.getItemNum()));
-                    order.setImageUrl(item.getProductImg());
-                    order.setPrice(item.getTotalPayAmount());
-                    order.setCommissionRate(item.getJtkShareRate());
-                    order.setActualCosPrice(item.getTotalPayAmount());
-                    order.setActualFee(item.getJtkShareFee());
-                    if (ObjectUtil.equals(item.getFlowPoint(), "PAY_SUCC")) {
-                      order.setStatus(OrderStatus.DELIVER.getCode());
-                    } else if (ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
-                      order.setStatus(OrderStatus.COMPLETE.getCode());
-                    } else if (ObjectUtil.equals(item.getFlowPoint(), "REFUND")) {
-                      order.setStatus(OrderStatus.INVALID.getCode());
-                      order.setStatusDes("退款");
-                    }
-                    order.setUid(item.getSid());
-                    order.setRate(dyProperties.getRate());
-                    // 金额小于0.02不算返利
-                    order.setRebate(
-                        new BigDecimal(item.getJtkShareFee()).compareTo(new BigDecimal("0.02")) >= 1
-                            ? new BigDecimal(order.getActualFee())
-                                .multiply(new BigDecimal(order.getRate()))
-                                .setScale(2, RoundingMode.DOWN)
-                                .toString()
-                            : "0.00");
-                    return order;
-                  })
-              .collect(Collectors.toList());
-      XLogger.log(
-          logger,
-          env,
-          "同步抖音订单:[{}~{}],第{}页,{}",
-          startTime,
-          endTime,
-          page,
-          JsonUtil.transferToJson(list));
-      if (list.size() > 0) {
-        baseMapper.saveOrUpdateList(list);
+    if (response.getData() instanceof Map) {
+      JTKDYOrderResponse.DataDTO dataDTO =
+          JsonUtil.transferToObj(
+              JsonUtil.transferToJson(response.getData()), JTKDYOrderResponse.DataDTO.class);
+      if (ObjectUtil.isNotEmpty(dataDTO.getData())) {
+        List<OmsOrder> list =
+            dataDTO.getData().stream()
+                .map(
+                    (item) -> {
+                      OmsOrder order = new OmsOrder();
+                      order.setOrderSource(ProductSource.DY.getCode());
+                      order.setOrderId(item.getOrderId());
+                      order.setOrderSn(item.getOrderId());
+                      order.setOrderEmt(2);
+                      if (ObjectUtil.isNotEmpty(item.getPaySuccessTime())) {
+                        order.setOrderTime(
+                            LocalDateTime.parse(
+                                item.getPaySuccessTime(),
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getUpdateTime())
+                          && ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
+                        order.setFinishTime(
+                            LocalDateTime.parse(
+                                item.getUpdateTime(),
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getUpdateTime())) {
+                        order.setModifyTime(
+                            LocalDateTime.parse(
+                                item.getUpdateTime(),
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getSettleTime())) {
+                        order.setSettleTime(
+                            LocalDateTime.parse(
+                                item.getSettleTime(),
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                      }
+                      order.setSkuId(item.getProductId());
+                      order.setSkuName(item.getProductName());
+                      order.setSkuNum(Long.valueOf(item.getItemNum()));
+                      order.setImageUrl(item.getProductImg());
+                      order.setPrice(item.getTotalPayAmount());
+                      order.setCommissionRate(item.getJtkShareRate());
+                      order.setActualCosPrice(item.getTotalPayAmount());
+                      order.setActualFee(item.getJtkShareFee());
+                      if (ObjectUtil.equals(item.getFlowPoint(), "PAY_SUCC")) {
+                        order.setStatus(OrderStatus.DELIVER.getCode());
+                      } else if (ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
+                        order.setStatus(OrderStatus.COMPLETE.getCode());
+                      } else if (ObjectUtil.equals(item.getFlowPoint(), "REFUND")) {
+                        order.setStatus(OrderStatus.INVALID.getCode());
+                        order.setStatusDes("退款");
+                      }
+                      order.setUid(item.getSid());
+                      order.setRate(dyProperties.getRate());
+                      // 金额小于0.02不算返利
+                      order.setRebate(
+                          new BigDecimal(item.getJtkShareFee()).compareTo(new BigDecimal("0.02"))
+                                  >= 1
+                              ? new BigDecimal(order.getActualFee())
+                                  .multiply(new BigDecimal(order.getRate()))
+                                  .setScale(2, RoundingMode.DOWN)
+                                  .toString()
+                              : "0.00");
+                      return order;
+                    })
+                .collect(Collectors.toList());
+        XLogger.log(
+            logger,
+            env,
+            "同步抖音订单:[{}~{}],第{}页,{}",
+            startTime,
+            endTime,
+            page,
+            JsonUtil.transferToJson(list));
+        if (list.size() > 0) {
+          baseMapper.saveOrUpdateList(list);
+        }
       }
-    }
-    if (response.getData() != null
-        && response.getData().getLastPage() > response.getData().getCurrentPage()) {
-      // 下一页
-      try {
-        Thread.sleep(1000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
+      if (dataDTO.getLastPage() > dataDTO.getCurrentPage()) {
+        // 下一页
+        try {
+          Thread.sleep(1000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        syncOrderPage(page + 1, startTime, endTime);
       }
-      syncOrderPage(page + 1, startTime, endTime);
     }
   }
 

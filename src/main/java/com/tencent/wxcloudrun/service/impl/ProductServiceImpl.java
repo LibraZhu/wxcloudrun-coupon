@@ -146,7 +146,6 @@ public class ProductServiceImpl implements ProductService {
       return pddService.getUnionUrl(param.getProductId(), param.getSearchId(), param.getUid());
     }
     if (param.getSource() == ProductSource.TB.getCode()) {
-      tbService.getUidBySpecialId("2979617303");
       return tbService.getUnionUrl(param.getProductId(), param.getUid());
     }
     if (param.getSource() == ProductSource.WPH.getCode()) {

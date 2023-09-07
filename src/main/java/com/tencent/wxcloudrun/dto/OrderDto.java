@@ -27,7 +27,7 @@ public class OrderDto {
   private LocalDateTime finishTime;
 
   /** 预估结算时间 */
-  private String settlementTime;
+  private LocalDateTime settlementTime;
 
   /** 下单设备 1->pc; 2->无线 */
   private Integer orderEmt;
@@ -53,7 +53,7 @@ public class OrderDto {
   /** 商品单价 */
   private String price;
 
-  /** 商品单价 */
+  /** 商品总价 */
   private String priceTotal;
 
   /** 返利 */

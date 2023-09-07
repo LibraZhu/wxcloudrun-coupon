@@ -109,15 +109,17 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     }
     String oneHourEndTime =
         DateUtil.formatDateTime(DateUtil.offsetHour(DateUtil.parseDateTime(startTime), 1));
-    syncOrderPage(1, startTime, oneHourEndTime);
     // 如果一个小时后时间在结束时间之前，继续查询
     if (DateUtil.parseDateTime(oneHourEndTime).isBefore(DateUtil.parseDateTime(endTime))) {
+      syncOrderPage(1, startTime, oneHourEndTime);
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
       syncOrder(oneHourEndTime, endTime);
+    } else {
+      syncOrderPage(1, startTime, endTime);
     }
   }
 
@@ -146,7 +148,8 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           "SyncJDOrder",
           JsonUtil.transferToJson(orderReq),
           JsonUtil.transferToJson(response));
-      if (response.getQueryResult() != null && response.getQueryResult().getData() != null) {
+      if (response.getQueryResult() != null
+          && ObjectUtil.isNotEmpty(response.getQueryResult().getData())) {
         List<OmsOrder> list =
             Arrays.stream(response.getQueryResult().getData())
                 .map(

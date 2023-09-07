@@ -17,24 +17,28 @@ import com.tencent.wxcloudrun.config.properties.HJKProperties;
 import com.tencent.wxcloudrun.config.properties.TBProperties;
 import com.tencent.wxcloudrun.dao.OmsOrderMapper;
 import com.tencent.wxcloudrun.dto.*;
+import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
+import com.tencent.wxcloudrun.model.UmsUserTb;
 import com.tencent.wxcloudrun.service.TBService;
+import com.tencent.wxcloudrun.service.UmsUserTbService;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -44,16 +48,18 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   final Logger logger = LoggerFactory.getLogger(TBServiceImpl.class);
 
-  @Resource private TBProperties taobaoProperties;
+  @Resource private TBProperties tbProperties;
 
   @Resource private HJKProperties hjkProperties;
+
+  @Resource private UmsUserTbService umsUserTbService;
 
   @Value("${spring.profiles.active}")
   private String env;
 
   private DefaultTaobaoClient getTBClient() {
     return new DefaultTaobaoClient(
-        taobaoProperties.getUrl(), taobaoProperties.getAppKey(), taobaoProperties.getAppSecret());
+        tbProperties.getUrl(), tbProperties.getAppKey(), tbProperties.getAppSecret());
   }
 
   @Override
@@ -66,15 +72,17 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     }
     String oneHourEndTime =
         DateUtil.formatDateTime(DateUtil.offsetHour(DateUtil.parseDateTime(startTime), 1));
-    syncOrderPage(1, startTime, oneHourEndTime, null);
     // 如果一个小时后时间在结束时间之前，继续查询
     if (DateUtil.parseDateTime(oneHourEndTime).isBefore(DateUtil.parseDateTime(endTime))) {
+      syncOrderPage(1, startTime, oneHourEndTime, null);
       try {
         Thread.sleep(1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
       syncOrder(oneHourEndTime, endTime);
+    } else {
+      syncOrderPage(1, startTime, endTime, null);
     }
   }
 
@@ -91,7 +99,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           new HashMap<String, Object>() {
             {
               put("apikey", hjkProperties.getApiKey());
-              put("query_type", 4);
+              put("query_type", 1);
               put("start_time", startTime);
               put("end_time", endTime);
               put("position_index", positionIndex);
@@ -99,34 +107,160 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
               put("page_size", 50);
             }
           };
-      ResponseEntity<HJKOrderResponse> responseEntity =
-          RestTemplateUtil.getInstance().postForEntity(api, map, HJKOrderResponse.class);
-      if (StrUtil.equals(env, "dev")) {
-        logger.info(
-            "Method:[{}],Request:{},Response:{}",
-            "SyncPDDOrder",
-            JsonUtil.transferToJson(map),
-            JsonUtil.transferToJson(responseEntity));
+      HJKTBOrderResponse response =
+          RestTemplateUtil.getInstance().postForObject(api, map, HJKTBOrderResponse.class);
+      XLogger.log(
+          logger,
+          env,
+          "Method:[{}],Request:{},Response:{}",
+          "SyncTBOrder",
+          JsonUtil.transferToJson(map),
+          JsonUtil.transferToJson(response));
+      if (response == null || response.getData() == null) {
+        return;
       }
-      if (responseEntity.getBody() != null
-          && responseEntity.getBody().getData() != null
-          && responseEntity.getBody().getData().getResults() != null
-          && responseEntity.getBody().getData().getResults().getPublisher_order_dto() != null) {
+      if (response.getData() instanceof Map) {
+        HJKTBOrderResponse.OrderPage orderPage =
+            JsonUtil.transferToObj(
+                JsonUtil.transferToJson(response.getData()), HJKTBOrderResponse.OrderPage.class);
 
-        if (ObjectUtil.equals(responseEntity.getBody().getData().getHas_next(), "true")) {
+        if (ObjectUtil.isNotNull(orderPage.getResults())
+            && ObjectUtil.isNotEmpty(orderPage.getResults().getPublisher_order_dto())) {
+          List<String> sidList = new ArrayList<>();
+          List<OmsOrder> list =
+              orderPage.getResults().getPublisher_order_dto().stream()
+                  .map(
+                      item -> {
+                        OmsOrder order = new OmsOrder();
+                        order.setOrderSource(ProductSource.TB.getCode());
+                        order.setOrderId(item.getTradeId());
+                        order.setOrderSn(item.getTradeParentId());
+                        order.setOrderEmt(2);
+                        if (ObjectUtil.isNotEmpty(item.getTkPaidTime())) {
+                          order.setOrderTime(
+                              LocalDateTime.parse(
+                                  item.getTkPaidTime(),
+                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        }
+                        if (ObjectUtil.isNotEmpty(item.getModifiedTime())
+                            && ObjectUtil.equals(item.getTkStatus(), 14)) {
+                          order.setFinishTime(
+                              LocalDateTime.parse(
+                                  item.getModifiedTime(),
+                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        }
+                        if (ObjectUtil.isNotEmpty(item.getModifiedTime())) {
+                          order.setModifyTime(
+                              LocalDateTime.parse(
+                                  item.getModifiedTime(),
+                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        }
+                        if (ObjectUtil.isNotEmpty(item.getTkEarningTime())) {
+                          order.setSettleTime(
+                              LocalDateTime.parse(
+                                  item.getTkEarningTime(),
+                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                        }
+                        order.setPid(
+                            Optional.ofNullable(item.getPubId()).map(Object::toString).orElse(""));
+                        order.setSkuId(item.getItemId());
+                        order.setSkuName(item.getItemTitle());
+                        order.setSkuNum(Long.valueOf(item.getItemNum()));
+                        order.setImageUrl(item.getItemImg());
+                        order.setPrice(item.getItemPrice());
+                        order.setCommissionRate(item.getTotalCommissionRate());
+                        order.setActualCosPrice(item.getPayPrice());
+                        order.setActualFee(item.getTotalCommissionFee());
+                        if (ObjectUtil.equals(item.getTkStatus(), 12)) {
+                          order.setStatus(OrderStatus.DELIVER.getCode());
+                        } else if (ObjectUtil.equals(item.getTkStatus(), 14)) {
+                          order.setStatus(OrderStatus.COMPLETE.getCode());
+                        } else if (ObjectUtil.equals(item.getTkEarningTime(), 13)) {
+                          order.setStatus(OrderStatus.INVALID.getCode());
+                        }
+                        String sid =
+                            Optional.ofNullable(item.getSpecialId())
+                                .map(Object::toString)
+                                .orElse("");
+                        order.setUid(sid);
+
+                        // 缓存所有的sid，后续获取uid
+                        if (ObjectUtil.isNotEmpty(sid) && !sidList.contains(sid)) {
+                          sidList.add(sid);
+                        }
+                        order.setRate(tbProperties.getRate());
+                        // 金额小于0.02不算返利
+                        order.setRebate(
+                            new BigDecimal(item.getTotalCommissionFee())
+                                        .compareTo(new BigDecimal("0.02"))
+                                    >= 1
+                                ? new BigDecimal(order.getActualFee())
+                                    .multiply(new BigDecimal(order.getRate()))
+                                    .setScale(2, RoundingMode.DOWN)
+                                    .toString()
+                                : "0.00");
+                        return order;
+                      })
+                  .collect(Collectors.toList());
+          if (list.size() > 0) {
+            baseMapper.saveOrUpdateList(list);
+          }
+          XLogger.log(
+              logger,
+              env,
+              "同步淘宝订单:[{}~{}],第{}页,{}",
+              startTime,
+              endTime,
+              page,
+              JsonUtil.transferToJson(list));
+
+          getUidBySpecialId(sidList);
+        }
+        if (ObjectUtil.equals(orderPage.getHas_next(), "true")) {
           // 是否还有更多
           try {
             Thread.sleep(1000);
           } catch (InterruptedException e) {
             e.printStackTrace();
           }
-          syncOrderPage(
-              page + 1, startTime, endTime, responseEntity.getBody().getData().getPosition_index());
+          syncOrderPage(page + 1, startTime, endTime, orderPage.getPosition_index());
         }
       }
     } catch (Exception e) {
       e.printStackTrace();
     }
+  }
+
+  /**
+   * 根据sid获取uid
+   *
+   * @param sidList sid列表
+   */
+  private void getUidBySpecialId(List<String> sidList) {
+    if (ObjectUtil.isEmpty(sidList)) {
+      return;
+    }
+    umsUserTbService.lambdaQuery().in(UmsUserTb::getSpecialId, sidList).select().list().stream()
+        .map(UmsUserTb::getSpecialId)
+        .forEach(sidList::remove);
+    if (ObjectUtil.isEmpty(sidList)) {
+      return;
+    }
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    executorService.execute(
+        () -> {
+          sidList.forEach(
+              sid -> {
+                String uid = getUidBySpecialId(sid);
+                if (ObjectUtil.isNotEmpty(uid)) {
+                  UmsUserTb umsUserTb = new UmsUserTb();
+                  umsUserTb.setUid(Long.valueOf(uid));
+                  umsUserTb.setSpecialId(sid);
+                  umsUserTbService.getBaseMapper().insert(umsUserTb);
+                }
+              });
+        });
+    executorService.shutdown();
   }
 
   @Override
@@ -201,7 +335,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       request.setPageNo(param.getPage());
       request.setPageSize(param.getPageSize());
       request.setMaterialId(param.getOptId());
-      request.setAdzoneId(taobaoProperties.getPid());
+      request.setAdzoneId(tbProperties.getPid());
       TbkDgOptimusMaterialResponse response = getTBClient().execute(request);
       XLogger.log(
           logger,
@@ -314,7 +448,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         request.setSort("price_asc");
       }
       request.setQ(param.getKeyword());
-      request.setAdzoneId(taobaoProperties.getPid());
+      request.setAdzoneId(tbProperties.getPid());
       request.setPageResultKey(param.getListId());
       TbkDgMaterialOptionalResponse response = getTBClient().execute(request);
       XLogger.log(
@@ -330,7 +464,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             param.getPageSize(),
             response.getTotalResults(),
             response.getResultList().stream()
-                .flatMap(
+                .map(
                     (item) -> {
                       HJKJDProduct product = new HJKJDProduct();
                       product.setGoods_id(item.getItemId());
@@ -373,7 +507,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                         product.setSalesTip(String.format("月售%s件", item.getTkTotalSales()));
                       }
                       product.setSource(ProductSource.TB.getCode());
-                      return Arrays.stream(new HJKJDProduct[] {product});
+                      return product;
                     })
                 .collect(Collectors.toList()),
             response.getPageResultKey());
@@ -464,7 +598,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           {
             put("apikey", hjkProperties.getApiKey());
             put("item_id", id);
-            put("pid", taobaoProperties.getXpid());
+            put("pid", tbProperties.getXpid());
             put("external_id", uid);
             put("get_tkl", 1);
           }
@@ -485,7 +619,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public HJKTBInviterResponse.TbMapData getUidBySpecialId(String specialId) {
+  public String getUidBySpecialId(String specialId) {
     // 获取推广链接
     String api = hjkProperties.getApiUrl() + "/tb/publisherget";
     Map<String, Object> map =
@@ -496,22 +630,51 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             put("special_id", specialId);
           }
         };
-    ResponseEntity<HJKTBInviterResponse> response =
-        RestTemplateUtil.getInstance().postForEntity(api, map, HJKTBInviterResponse.class);
+    HJKTBInviterResponse response =
+        RestTemplateUtil.getInstance().postForObject(api, map, HJKTBInviterResponse.class);
     XLogger.log(
         logger,
         env,
         "Method:[{}],Request:{},Response:{}",
         "根据会员id获取uid",
         JsonUtil.transferToJson(map),
-        JsonUtil.transferToJson(response.getBody()));
-    if (response.getBody() != null
-        && response.getBody().getData() != null
-        && response.getBody().getData().getInviter_list() != null) {
-      return response.getBody().getData().getInviter_list().getMap_data();
-    }
+        JsonUtil.transferToJson(response));
 
-    return null;
+    return Optional.ofNullable(response)
+        .map(HJKTBInviterResponse::getData)
+        .map(HJKTBInviterResponse.TbInviterData::getInviter_list)
+        .map(HJKTBInviterResponse.TbInviterList::getMap_data)
+        .map(HJKTBInviterResponse.TbMapData::getExternal_id)
+        .orElse("");
+  }
+
+  @Override
+  public String getSpecialIdByUid(String uid) {
+    // 获取推广链接
+    String api = hjkProperties.getApiUrl() + "/tb/publisherget";
+    Map<String, Object> map =
+        new HashMap<String, Object>() {
+          {
+            put("apikey", hjkProperties.getApiKey());
+            put("info_type", 2);
+            put("external_id", uid);
+          }
+        };
+    HJKTBInviterResponse response =
+        RestTemplateUtil.getInstance().postForObject(api, map, HJKTBInviterResponse.class);
+    XLogger.log(
+        logger,
+        env,
+        "Method:[{}],Request:{},Response:{}",
+        "根据uid获取淘宝会员id",
+        JsonUtil.transferToJson(map),
+        JsonUtil.transferToJson(response));
+    return Optional.ofNullable(response)
+        .map(HJKTBInviterResponse::getData)
+        .map(HJKTBInviterResponse.TbInviterData::getInviter_list)
+        .map(HJKTBInviterResponse.TbInviterList::getMap_data)
+        .map(HJKTBInviterResponse.TbMapData::getSpecial_id)
+        .orElse("");
   }
 
   private String getRebate(BigDecimal commission) {
@@ -519,7 +682,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       return "0";
     }
     return commission
-        .multiply(new BigDecimal(taobaoProperties.getRate()))
+        .multiply(new BigDecimal(tbProperties.getRate()))
         .setScale(2, RoundingMode.DOWN)
         .stripTrailingZeros()
         .toPlainString();

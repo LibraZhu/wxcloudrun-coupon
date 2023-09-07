@@ -16,6 +16,13 @@ import com.tencent.wxcloudrun.model.OmsOrder;
  */
 public interface OmsOrderService extends IService<OmsOrder> {
     /**
+     * 同步订单定时器
+     *
+     * @param startTime 开始时间
+     * @param endTime   结束时间
+     */
+    void syncTask(String startTime, String endTime);
+    /**
      * 同步订单
      *
      * @param startTime 开始时间
