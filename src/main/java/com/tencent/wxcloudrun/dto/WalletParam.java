@@ -10,9 +10,6 @@ import java.util.List;
 /** 钱包参数 */
 @Data
 public class WalletParam {
-  @ApiModelProperty(value = "用户标识")
-  @NotBlank(message = "用户不能为空")
-  private String uid;
   @ApiModelProperty(value = "银行卡")
   private String bank;
   @ApiModelProperty(value = "银行名称")

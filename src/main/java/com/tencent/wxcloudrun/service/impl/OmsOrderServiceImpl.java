@@ -12,6 +12,7 @@ import com.tencent.wxcloudrun.dto.OrderQueryParam;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.model.UmsUserTb;
 import com.tencent.wxcloudrun.service.*;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -74,9 +75,11 @@ public class OmsOrderServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder>
     if (ObjectUtil.isNotEmpty(queryParam.getStatus())) {
       queryWrapper.eq("status", queryParam.getStatus());
     }
-    if (ObjectUtil.isNotEmpty(queryParam.getUid())) {
-      queryWrapper.eq("uid", queryParam.getUid());
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isNotEmpty(uid)) {
+      queryWrapper.eq("uid", uid);
     }
+    queryWrapper.orderByDesc("order_time");
     IPage<OmsOrder> orderPage =
         this.page(new Page<>(queryParam.getPage(), queryParam.getPageSize()), queryWrapper);
     return CommonPage.page(

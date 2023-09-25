@@ -6,6 +6,7 @@
     <resultMap id="BaseResultMap" type="com.tencent.wxcloudrun.model.UmsUser">
         <id column="id" property="id" />
         <result column="openid" property="openid" />
+        <result column="g_openid" property="gOpenid" />
         <result column="unionid" property="unionid" />
         <result column="phone" property="phone" />
         <result column="nickname" property="nickname" />
@@ -14,7 +15,7 @@
 
     <!-- 通用查询结果列 -->
     <sql id="Base_Column_List">
-        id, openid, unionid, phone, nickname, avatar
+        id, openid, g_openid, unionid, phone, nickname, avatar
     </sql>
 
 </mapper>

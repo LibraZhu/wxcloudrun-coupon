@@ -1,6 +1,5 @@
 package com.tencent.wxcloudrun.controller;
 
-import cn.hutool.core.util.ObjectUtil;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.api.CommonResult;
 import com.tencent.wxcloudrun.common.api.ResultCode;
@@ -18,7 +17,6 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -72,28 +70,14 @@ public class ProductController {
   @ApiOperation("商品详情")
   @PostMapping("/detail")
   @ResponseBody
-  public CommonResult<HJKJDProduct> detail(
-          @RequestHeader Map<String, String> headers, @Validated @RequestBody ProductDetailParam param) {
-    String uid = param.getUid();
-    // 如果没有uid参数，先登录获取uid
-    if (ObjectUtil.isEmpty(uid)) {
-      uid = umsUserService.login(headers.get("x-wx-from-openid"), headers.get("x-wx-from-unionid")).getId().toString();
-      param.setUid(uid);
-    }
+  public CommonResult<HJKJDProduct> detail(@Validated @RequestBody ProductDetailParam param) {
     return CommonResult.success(productService.detail(param));
   }
 
   @ApiOperation("商品转链")
   @PostMapping("/link")
   @ResponseBody
-  public CommonResult<Object> link(
-      @RequestHeader Map<String, String> headers, @Validated @RequestBody ProductLinkParam param) {
-    String uid = param.getUid();
-    // 如果没有uid参数，先登录获取uid
-    if (ObjectUtil.isEmpty(uid)) {
-      uid = umsUserService.login(headers.get("x-wx-from-openid"), headers.get("x-wx-from-unionid")).getId().toString();
-      param.setUid(uid);
-    }
+  public CommonResult<Object> link(@Validated @RequestBody ProductLinkParam param) {
     return CommonResult.success(productService.link(param));
   }
 

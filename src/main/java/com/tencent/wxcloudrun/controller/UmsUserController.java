@@ -36,9 +36,17 @@ public class UmsUserController {
   @ApiOperation("小程序用户登录")
   @PostMapping(value = "/login")
   @ResponseBody
-  public CommonResult<UmsUser> register(@RequestHeader Map<String, String> headers) {
+  public CommonResult<UmsUser> login(@RequestHeader Map<String, String> headers) {
     return CommonResult.success(
         umsUserService.login(headers.get("x-wx-from-openid"), headers.get("x-wx-from-unionid")));
+  }
+
+  @ApiOperation("公众号用户登录")
+  @PostMapping(value = "/loginG")
+  @ResponseBody
+  public CommonResult<UmsUser> loginG(@RequestBody Map<String, String> request) {
+    return CommonResult.success(
+        umsUserService.loginG(request.get("openid"), request.get("gOpenid")));
   }
 
   @ApiOperation("用户信息更新")

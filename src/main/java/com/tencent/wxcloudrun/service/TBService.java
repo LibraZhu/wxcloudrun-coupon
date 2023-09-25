@@ -3,7 +3,6 @@ package com.tencent.wxcloudrun.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.dto.HJKJDProduct;
-import com.tencent.wxcloudrun.dto.HJKTBInviterResponse;
 import com.tencent.wxcloudrun.dto.ProductQueryParam;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
 import com.tencent.wxcloudrun.model.OmsOrder;
@@ -29,9 +28,10 @@ public interface TBService extends IService<OmsOrder> {
    * 公众号链接转链回复
    *
    * @param request 微信消息
+   * @param uid
    * @return 微信回复消息
    */
-  Object wxMessage(WxMessageRequest request);
+  Object wxMessage(WxMessageRequest request, Long uid);
 
   /**
    * 商品物料搜索

@@ -2,19 +2,12 @@ package com.tencent.wxcloudrun.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
 
-@EqualsAndHashCode(callSuper = true)
 @Data
-public class HJKTBLinkResponse extends HJKResponse {
-  private Object data;
-
-  @Data
-  public static class TbLink {
-
+public class HJKTBLink {
     @JsonProperty("category_id")
     private String categoryId;
     @JsonProperty("coupon_click_url")
@@ -72,7 +65,7 @@ public class HJKTBLinkResponse extends HJKResponse {
     @JsonProperty("seller_id")
     private String sellerId;
     @JsonProperty("small_images")
-    private SmallImagesDTO smallImages;
+    private HJKTBLinkResponse.TbLink.SmallImagesDTO smallImages;
     @JsonProperty("superior_brand")
     private String superiorBrand;
     @JsonProperty("title")
@@ -101,8 +94,7 @@ public class HJKTBLinkResponse extends HJKResponse {
     @NoArgsConstructor
     @Data
     public static class SmallImagesDTO {
-      @JsonProperty("string")
-      private List<String> string;
+        @JsonProperty("string")
+        private List<String> string;
     }
-  }
 }

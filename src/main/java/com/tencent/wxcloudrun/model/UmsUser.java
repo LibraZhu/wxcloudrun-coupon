@@ -41,6 +41,12 @@ public class UmsUser implements Serializable {
     private String openid;
 
     /**
+     * 公众号openid
+     */
+    @TableField("g_openid")
+    private String gOpenid;
+
+    /**
      * 小程序unionid
      */
     @TableField("unionid")

@@ -5,7 +5,7 @@ public enum OrderStatus {
   DELIVER(1, "待收货"),
   COMPLETE(2, "已完成，待结算"),
   SETTLED(3, "已结算"),
-  INVALID(4, "审核失败");
+  INVALID(4, "已失效");
   private final int code;
   private final String message;
 

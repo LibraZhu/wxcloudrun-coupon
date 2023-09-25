@@ -4,7 +4,9 @@ import com.tencent.wxcloudrun.config.properties.JTKProperties;
 import com.tencent.wxcloudrun.dto.JTKELELinkResponse;
 import com.tencent.wxcloudrun.dto.JTKLinkResponse;
 import com.tencent.wxcloudrun.dto.JTKMTLinkResponse;
+import com.tencent.wxcloudrun.model.SysConfig;
 import com.tencent.wxcloudrun.service.JTKService;
+import com.tencent.wxcloudrun.service.SysConfigService;
 import com.tencent.wxcloudrun.utils.RequestHolder;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import org.slf4j.Logger;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -20,46 +23,16 @@ public class JTKServiceImpl implements JTKService {
   final Logger logger = LoggerFactory.getLogger(JTKServiceImpl.class);
 
   @Resource private JTKProperties jtkProperties;
+  @Resource private SysConfigService sysConfigService;
 
   @Override
-  public Object getMeituanLink(Integer type) {
-    // 获取推广链接
-    String api = jtkProperties.getApiUrl() + "/Meituan/act";
-    Map<String, Object> map =
-        new HashMap<String, Object>() {
-          {
-            put("apikey", jtkProperties.getApiKey());
-            put("type", type);
-            put("sid", RequestHolder.getUid());
-            put("channels", 1);
-          }
-        };
-    JTKMTLinkResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, map, JTKMTLinkResponse.class);
-    if (response != null && response.getData() != null) {
-      return response.getData().getWeAppInfo();
-    }
-    return null;
+  public Object getMeituanLink() {
+    return sysConfigService.lambdaQuery().like(SysConfig::getCCode,"meituan_link").select().list();
   }
 
   @Override
-  public Object getEleLink(Integer type) {
-    // 获取推广链接
-    String api = jtkProperties.getApiUrl() + "/Ele/act";
-    Map<String, Object> map =
-        new HashMap<String, Object>() {
-          {
-            put("apikey", jtkProperties.getApiKey());
-            put("type", type);
-            put("sid", RequestHolder.getUid());
-          }
-        };
-    JTKELELinkResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, map, JTKELELinkResponse.class);
-    if (response != null && response.getData() != null) {
-      return response.getData();
-    }
-    return null;
+  public Object getEleLink() {
+    return sysConfigService.lambdaQuery().like(SysConfig::getCCode,"ele_link").select().list();
   }
 
   @Override
@@ -76,7 +49,7 @@ public class JTKServiceImpl implements JTKService {
         actId = 49;
         break;
       case 3:
-        actId = 54;
+        actId = 76;
         break;
     }
     // 获取推广链接

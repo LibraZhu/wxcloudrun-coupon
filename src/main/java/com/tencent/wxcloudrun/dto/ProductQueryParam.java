@@ -33,4 +33,10 @@ public class ProductQueryParam extends PageParam {
 
   @ApiModelProperty(value = "商品goodsSign，多个用英文逗号分隔")
   private String goodsIds;
+
+  @ApiModelProperty(value = "是否是天猫")
+  private Boolean isTmall;
+
+  @ApiModelProperty(value = "用户id")
+  private String uid;
 }

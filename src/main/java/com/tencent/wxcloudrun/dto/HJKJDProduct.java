@@ -29,4 +29,6 @@ public class HJKJDProduct {
   private String searchId; //
   private String discountWph; // 唯品会折扣
   private String tkl; // 抖音口令
+  private String click_url;
+  private Boolean is_tmall;
 }

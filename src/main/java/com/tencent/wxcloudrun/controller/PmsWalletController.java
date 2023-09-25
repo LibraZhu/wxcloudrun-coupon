@@ -29,21 +29,21 @@ public class PmsWalletController {
   @ApiOperation("钱包信息")
   @PostMapping("/number")
   @ResponseBody
-  public CommonResult<WalletMoneyDto> number(@Validated @RequestBody WalletParam request) {
+  public CommonResult<WalletMoneyDto> number(@RequestBody WalletParam request) {
     return CommonResult.success(pmsWalletService.number(request));
   }
 
   @ApiOperation("钱包信息")
   @PostMapping("/info")
   @ResponseBody
-  public CommonResult<PmsWallet> info(@Validated @RequestBody WalletParam request) {
+  public CommonResult<PmsWallet> info(@RequestBody WalletParam request) {
     return CommonResult.success(pmsWalletService.info(request));
   }
 
   @ApiOperation("钱包信息")
   @PostMapping("/info/modify")
   @ResponseBody
-  public CommonResult<Object> modify(@Validated @RequestBody WalletParam request) {
+  public CommonResult<Object> modify(@RequestBody WalletParam request) {
     return CommonResult.success(pmsWalletService.modify(request));
   }
 }

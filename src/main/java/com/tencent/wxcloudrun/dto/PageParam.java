@@ -11,7 +11,4 @@ public class PageParam {
 
   @ApiModelProperty(value = "当前页")
   private Long page = 1L;
-
-  @ApiModelProperty(value = "用户标识")
-  private String uid;
 }

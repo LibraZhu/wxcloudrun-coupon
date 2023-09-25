@@ -28,9 +28,10 @@ public interface JDService extends IService<OmsOrder> {
    * 公众号链接转链回复
    *
    * @param request 微信消息
+   * @param uid
    * @return 微信回复消息
    */
-  Object wxMessage(WxMessageRequest request);
+  Object wxMessage(WxMessageRequest request, Long uid);
 
   /**
    * 京粉商品列表
@@ -46,7 +47,7 @@ public interface JDService extends IService<OmsOrder> {
    * @param param 查询条件
    * @return 商品列表
    */
-  CommonPage<HJKJDProduct> searchHJKProduct(ProductQueryParam param);
+  CommonPage<HJKJDProduct> searchProduct(ProductQueryParam param);
 
   /**
    * 蚂蚁星球 京东商详
@@ -54,7 +55,7 @@ public interface JDService extends IService<OmsOrder> {
    * @param productId 商品id
    * @return 商详
    */
-  HJKJDProduct getHJKProductDetail(String productId);
+  HJKJDProduct getProductDetail(String productId);
 
   /**
    * 好单库 京东推广链接
@@ -64,5 +65,5 @@ public interface JDService extends IService<OmsOrder> {
    * @param uid 子渠道
    * @return 推广链接
    */
-  String getHDKUnionUrl(String id, String coupon_url, String uid);
+  String getUnionUrl(String id, String coupon_url, String uid);
 }

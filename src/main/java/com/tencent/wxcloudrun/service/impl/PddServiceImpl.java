@@ -6,7 +6,6 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.pdd.pop.sdk.http.PopClient;
 import com.pdd.pop.sdk.http.PopHttpClient;
 import com.pdd.pop.sdk.http.api.pop.request.*;
@@ -23,6 +22,7 @@ import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.PddService;
+import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +60,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
     pIdList.add(clientProperties.getPid());
     request.setPIdList(pIdList);
     request.setCustomParameters(
-        JsonUtil.transferToJson(
+        JsonUtil.toJson(
             new HashMap<String, Object>() {
               {
                 put("uid", clientProperties.getUid());
@@ -119,8 +119,8 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           env,
           "Method:[{}],Request:{},Response:{}",
           "SyncPddOrder",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
       if (response.getOrderListGetResponse() != null
           && ObjectUtil.isNotEmpty(response.getOrderListGetResponse().getOrderList())) {
         List<OmsOrder> list =
@@ -212,7 +212,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
             startTime,
             endTime,
             page,
-            JsonUtil.transferToJson(list));
+            JsonUtil.toJson(list));
         if (list.size() > 0) {
           baseMapper.saveOrUpdateList(list);
           // 是否还有更多
@@ -230,7 +230,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
   }
 
   @Override
-  public Object wxMessage(WxMessageRequest request) {
+  public Object wxMessage(WxMessageRequest request, Long uid) {
     ProductQueryParam param = new ProductQueryParam();
     param.setKeyword(request.getContent());
     CommonPage<HJKJDProduct> page = searchProduct(param);
@@ -240,16 +240,26 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
       wxMessage.setFromUserName(request.getToUserName());
       wxMessage.setToUserName(request.getFromUserName());
       wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-      wxMessage.setMsgType("text");
-      String content = "券后价:" + product.getPrice_after() + " 约返:" + product.getRebate() + "\n";
-      content = content + "◇ " + product.getGoods_name() + "\n";
-      content =
-          content
-              + String.format(
-                  "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                      + "data-miniprogram-path=\"pages/product/index?id=%s&sid=%s&type=1\">点我马上购买</a>",
-                  product.getGoods_id(), product.getSearchId());
-      wxMessage.setContent(content);
+      wxMessage.setMsgType("news");
+      wxMessage.setArticleCount(1);
+      WxMessage.Articles articles = new WxMessage.Articles();
+      articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
+      articles.setDescription(product.getGoods_name());
+      articles.setPicUrl(product.getPicurl());
+      PddDdkGoodsPromotionUrlGenerateResponse
+              .GoodsPromotionUrlGenerateResponseGoodsPromotionUrlListItem
+          item =
+              (PddDdkGoodsPromotionUrlGenerateResponse
+                      .GoodsPromotionUrlGenerateResponseGoodsPromotionUrlListItem)
+                  getUnionUrl(product.getGoods_id(), product.getSearchId(), uid.toString());
+      articles.setUrl(
+          Optional.ofNullable(item)
+              .map(
+                  PddDdkGoodsPromotionUrlGenerateResponse
+                          .GoodsPromotionUrlGenerateResponseGoodsPromotionUrlListItem
+                      ::getMobileShortUrl)
+              .orElse(""));
+      wxMessage.setArticles(Collections.singletonList(articles));
       return wxMessage;
     }
     return "success";
@@ -270,9 +280,9 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           logger,
           env,
           "[{}],Request:{},Response:{}",
-          "拼夕夕商品搜索",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          "拼夕夕商品推荐",
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
 
       if (response.getGoodsBasicDetailResponse() != null
           && response.getGoodsBasicDetailResponse().getList() != null
@@ -344,9 +354,9 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
       request.setPageSize(param.getPageSize().intValue());
       request.setListId(param.getListId());
       request.setKeyword(param.getKeyword());
-      if (ObjectUtil.equals(param.getOptId(), 0)) {
+      if (ObjectUtil.equals(param.getOptId(), 0L)) {
         request.setActivityTags(Collections.singletonList(10564));
-      } else if (ObjectUtil.equals(param.getOptId(), -1)) {
+      } else if (ObjectUtil.equals(param.getOptId(), -1L)) {
         request.setActivityTags(Collections.singletonList(24));
       } else {
         request.setOptId(param.getOptId());
@@ -364,8 +374,8 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           env,
           "[{}],Request:{},Response:{}",
           "拼夕夕商品搜索",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(searchResponse));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(searchResponse));
       if (searchResponse.getGoodsSearchResponse() != null
           && searchResponse.getGoodsSearchResponse().getGoodsList() != null
           && searchResponse.getGoodsSearchResponse().getGoodsList().size() > 0) {
@@ -443,8 +453,8 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           env,
           "[{}],Request:{},Response:{}",
           "拼夕夕商品详情",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
       if (response.getGoodsDetailResponse() != null
           && ObjectUtil.isNotEmpty(response.getGoodsDetailResponse().getGoodsDetails())) {
         PddDdkGoodsDetailResponse.GoodsDetailResponseGoodsDetailsItem item =
@@ -501,7 +511,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
     try {
       PddDdkGoodsPromotionUrlGenerateRequest request = new PddDdkGoodsPromotionUrlGenerateRequest();
       request.setCustomParameters(
-          JsonUtil.transferToJson(
+          JsonUtil.toJson(
               new HashMap<String, Object>() {
                 {
                   put("uid", clientProperties.getUid());
@@ -528,8 +538,8 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
           env,
           "[{}],Request:{},Response:{}",
           "拼夕夕转链",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
 
       if (response.getGoodsPromotionUrlGenerateResponse() != null
           && ObjectUtil.isNotEmpty(

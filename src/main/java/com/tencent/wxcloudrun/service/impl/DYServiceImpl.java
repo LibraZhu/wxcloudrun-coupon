@@ -4,7 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.pdd.pop.sdk.common.util.JsonUtil;
+import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.DYProperties;
@@ -27,9 +27,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -95,15 +93,14 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "Method:[{}],Request:{},Response:{}",
         "SyncDYOrder",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response == null || response.getData() == null) {
       return;
     }
     if (response.getData() instanceof Map) {
       JTKDYOrderResponse.DataDTO dataDTO =
-          JsonUtil.transferToObj(
-              JsonUtil.transferToJson(response.getData()), JTKDYOrderResponse.DataDTO.class);
+          JsonUtil.toObj(JsonUtil.toJson(response.getData()), JTKDYOrderResponse.DataDTO.class);
       if (ObjectUtil.isNotEmpty(dataDTO.getData())) {
         List<OmsOrder> list =
             dataDTO.getData().stream()
@@ -170,13 +167,7 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                     })
                 .collect(Collectors.toList());
         XLogger.log(
-            logger,
-            env,
-            "同步抖音订单:[{}~{}],第{}页,{}",
-            startTime,
-            endTime,
-            page,
-            JsonUtil.transferToJson(list));
+            logger, env, "同步抖音订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.toJson(list));
         if (list.size() > 0) {
           baseMapper.saveOrUpdateList(list);
         }
@@ -194,7 +185,7 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public Object wxMessage(WxMessageRequest request) {
+  public Object wxMessage(WxMessageRequest request, Long uid) {
     Matcher matcher =
         Pattern.compile(Pattern.quote("【") + "(.*?)" + Pattern.quote("】"))
             .matcher(request.getContent());
@@ -202,7 +193,7 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       String keyword = matcher.group(1).trim();
       ProductQueryParam param = new ProductQueryParam();
       param.setKeyword(keyword);
-      param.setUid("dds");
+      param.setUid(uid.toString());
       CommonPage<HJKJDProduct> page = searchProduct(param);
       if (ObjectUtil.isNotEmpty(page.getList())) {
         HJKJDProduct product = page.getList().get(0);
@@ -210,28 +201,19 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         wxMessage.setFromUserName(request.getToUserName());
         wxMessage.setToUserName(request.getFromUserName());
         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("text");
-        String content = "券后价:" + product.getPrice_after() + " 约返:" + product.getRebate() + "\n";
-        content = content + "◇ " + product.getGoods_name() + "\n";
-        content =
-            content
-                + String.format(
-                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                        + "data-miniprogram-path=\"pages/product/index?id=%s&type=4\">点我马上购买</a>",
-                    product.getGoods_id());
-        if (page.getList().size() > 1) {
-          content =
-              content
-                  + "\n\n"
-                  + String.format(
-                      "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                          + "data-miniprogram-path=\"pages/search/list/index?keyword=%s&type=4\">查看相似商品</a>",
-                      keyword);
-        }
-        wxMessage.setContent(content);
+        wxMessage.setMsgType("news");
+        wxMessage.setArticleCount(1);
+        WxMessage.Articles articles = new WxMessage.Articles();
+        articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
+        articles.setDescription(product.getGoods_name());
+        articles.setPicUrl(product.getPicurl());
+        HJKJDProduct hjkjdProduct =
+            (HJKJDProduct) getUnionUrl(product.getGoods_id(), uid.toString());
+        articles.setUrl(
+            Optional.ofNullable(hjkjdProduct).map(HJKJDProduct::getClick_url).orElse(""));
+        wxMessage.setArticles(Collections.singletonList(articles));
         return wxMessage;
       }
-      return page.getList();
     }
     return "success";
   }
@@ -257,8 +239,8 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "抖音榜单商品列表",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response == null) {
       Asserts.fail("服务器异常");
     }
@@ -293,8 +275,8 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "抖音商品列表",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response == null) {
       Asserts.fail("服务器异常");
     }
@@ -337,8 +319,8 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "抖音商品列表",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response == null) {
       Asserts.fail("服务器异常");
     }
@@ -374,8 +356,8 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "抖音搜索商品",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response != null && ObjectUtil.isNotNull(response.getData())) {
       return toProduct(response.getData());
     }
@@ -385,11 +367,7 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   @Override
   public Object getUnionUrl(String id, String uid) {
     // 获取推广链接
-    HJKJDProduct product = getProductDetail(id, uid);
-    if (product != null) {
-      return product.getTkl();
-    }
-    return null;
+    return getProductDetail(id, uid);
   }
 
   private HJKJDProduct toProduct(JTKProduct item) {

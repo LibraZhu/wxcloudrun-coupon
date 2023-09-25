@@ -21,10 +21,6 @@ public class WalletCashParam {
   private String account;
 
   @ApiModelProperty(value = "用户标识")
-  @NotBlank(message = "用户不能为空")
-  private String uid;
-
-  @ApiModelProperty(value = "用户标识")
   @NotNull(message = "交易方式不能为空")
   private Integer payType;
 }

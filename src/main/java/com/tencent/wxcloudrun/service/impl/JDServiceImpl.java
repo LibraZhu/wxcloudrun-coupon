@@ -4,6 +4,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.jd.open.api.sdk.DefaultJdClient;
 import com.jd.open.api.sdk.domain.kplunion.GoodsService.request.query.JFGoodsReq;
 import com.jd.open.api.sdk.domain.kplunion.GoodsService.response.query.UrlInfo;
@@ -12,8 +13,6 @@ import com.jd.open.api.sdk.request.kplunion.UnionOpenGoodsJingfenQueryRequest;
 import com.jd.open.api.sdk.request.kplunion.UnionOpenOrderRowQueryRequest;
 import com.jd.open.api.sdk.response.kplunion.UnionOpenGoodsJingfenQueryResponse;
 import com.jd.open.api.sdk.response.kplunion.UnionOpenOrderRowQueryResponse;
-import com.pdd.pop.ext.fasterxml.jackson.core.type.TypeReference;
-import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.HDKProperties;
@@ -25,6 +24,7 @@ import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.JDService;
+import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
@@ -33,7 +33,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -43,10 +42,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -146,8 +142,8 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           env,
           "Method:[{}],Request:{},Response:{}",
           "SyncJDOrder",
-          JsonUtil.transferToJson(orderReq),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(orderReq),
+          JsonUtil.toJson(response));
       if (response.getQueryResult() != null
           && ObjectUtil.isNotEmpty(response.getQueryResult().getData())) {
         List<OmsOrder> list =
@@ -219,13 +215,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           baseMapper.saveOrUpdateList(list);
         }
         XLogger.log(
-            logger,
-            env,
-            "同步京东订单:[{}~{}],第{}页,{}",
-            startTime,
-            endTime,
-            page,
-            JsonUtil.transferToJson(list));
+            logger, env, "同步京东订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.toJson(list));
         if (response.getQueryResult() != null && response.getQueryResult().getHasMore()) {
           // 是否还有更多
           try {
@@ -242,29 +232,41 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public Object wxMessage(WxMessageRequest request) {
+  public Object wxMessage(WxMessageRequest request, Long uid) {
     try {
       String url = request.getContent().split("\\?")[0];
       String[] splits = url.split("/");
       String id = splits[splits.length - 1].replace(".html", "");
 
-      HJKJDProduct productDetail = getHJKProductDetail(id);
+      HJKJDProduct productDetail = getProductDetail(id);
       if (productDetail != null) {
         WxMessage wxMessage = new WxMessage();
         wxMessage.setFromUserName(request.getToUserName());
         wxMessage.setToUserName(request.getFromUserName());
         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("text");
-        String content =
-            "券后价:" + productDetail.getPrice_after() + " 约返:" + productDetail.getRebate() + "\n";
-        content = content + "◇ " + productDetail.getGoods_name() + "\n";
-        content =
-            content
-                + String.format(
-                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                        + "data-miniprogram-path=\"pages/product/index?id=%s&type=2\">点我马上购买</a>",
-                    productDetail.getGoods_id());
-        wxMessage.setContent(content);
+        wxMessage.setMsgType("news");
+        wxMessage.setArticleCount(1);
+        WxMessage.Articles articles = new WxMessage.Articles();
+        articles.setTitle(
+            "券后价:" + productDetail.getPrice_after() + " 约返:" + productDetail.getRebate());
+        articles.setDescription(productDetail.getGoods_name());
+        articles.setPicUrl(productDetail.getPicurl().replace("/jfs", "/s200x200_jfs"));
+        articles.setUrl(
+            getUnionUrl(productDetail.getGoods_id(), productDetail.getCouponurl(), uid.toString()));
+        wxMessage.setArticles(Collections.singletonList(articles));
+        //        wxMessage.setMsgType("text");
+        //        String content =
+        //            "券后价:" + productDetail.getPrice_after() + " 约返:" + productDetail.getRebate() +
+        // "\n";
+        //        content = content + "◇ " + productDetail.getGoods_name() + "\n";
+        //        content =
+        //            content
+        //                + String.format(
+        //                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
+        //                        +
+        // "data-miniprogram-path=\"pages/product/index?id=%s&type=2\">点我马上购买</a>",
+        //                    productDetail.getGoods_id());
+        //        wxMessage.setContent(content);
         return wxMessage;
       }
     } catch (Exception e) {
@@ -303,8 +305,8 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           env,
           "[{}],Request:{},Response:{}",
           "京东商品列表",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
       if (response.getQueryResult().getCode() != 200) {
         Asserts.fail(response.getQueryResult().getMessage());
       }
@@ -404,7 +406,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public CommonPage<HJKJDProduct> searchHJKProduct(ProductQueryParam param) {
+  public CommonPage<HJKJDProduct> searchProduct(ProductQueryParam param) {
     String api = hjkProperties.getApiUrl() + "/jd/goodslist";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
@@ -438,8 +440,8 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "hjk京东商品列表",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(hjkjdProductListResponse));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(hjkjdProductListResponse));
     if (hjkjdProductListResponse == null) {
       Asserts.fail("服务器异常");
     }
@@ -448,8 +450,8 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     }
     if (hjkjdProductListResponse.getData().getData() instanceof List) {
       List<HJKJDProduct> list =
-          JsonUtil.transferToObj(
-              JsonUtil.transferToJson(hjkjdProductListResponse.getData().getData()),
+          JsonUtil.toList(
+              JsonUtil.toJson(hjkjdProductListResponse.getData().getData()),
               new TypeReference<List<HJKJDProduct>>() {});
       // 计算返利
       list.forEach(
@@ -487,7 +489,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public HJKJDProduct getHJKProductDetail(String id) {
+  public HJKJDProduct getProductDetail(String id) {
     // 获取详情
     String api = hjkProperties.getApiUrl() + "/jd/goodsdetail";
     Map<String, Object> searchParams =
@@ -497,20 +499,20 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             put("goods_id", Long.valueOf(id));
           }
         };
-    ResponseEntity<HJKJDProductDetailResponse> detailResponseEntity =
+    HJKJDProductDetailResponse response =
         RestTemplateUtil.getInstance()
-            .postForEntity(api, searchParams, HJKJDProductDetailResponse.class);
+            .postForObject(api, searchParams, HJKJDProductDetailResponse.class);
     XLogger.log(
         logger,
         env,
         "[{}],Request:{},Response:{}",
         "hjk京东商品详情",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(detailResponseEntity));
-    if (detailResponseEntity.getBody() != null
-        && detailResponseEntity.getBody().getData() != null) {
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
+    if (response != null && response.getData() instanceof Map) {
+      HJKJDProduct product =
+          JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKJDProduct.class);
       // 计算返利
-      HJKJDProduct product = detailResponseEntity.getBody().getData();
       product.setRebate(
           getRebate(
               product.getCommission(),
@@ -534,7 +536,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public String getHDKUnionUrl(String id, String coupon_url, String uid) {
+  public String getUnionUrl(String id, String coupon_url, String uid) {
     // 获取推广链接
     String hdkApi = hdkProperties.getApiUrl() + "/get_jditems_link";
     MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
@@ -559,8 +561,8 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "hdk京东转链",
-        JsonUtil.transferToJson(map),
-        JsonUtil.transferToJson(productLinkResponse));
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(productLinkResponse));
     if (productLinkResponse != null && productLinkResponse.getData() != null) {
       return productLinkResponse.getData().getShort_url();
     }

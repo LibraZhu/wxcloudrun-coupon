@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.dao.PmsWalletMapper;
 import com.tencent.wxcloudrun.dto.WalletMoneyDto;
 import com.tencent.wxcloudrun.dto.WalletParam;
@@ -17,6 +18,7 @@ import com.tencent.wxcloudrun.model.PmsWalletRecord;
 import com.tencent.wxcloudrun.service.OmsOrderService;
 import com.tencent.wxcloudrun.service.PmsWalletRecordService;
 import com.tencent.wxcloudrun.service.PmsWalletService;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -45,14 +47,18 @@ public class PmsWalletServiceImpl extends ServiceImpl<PmsWalletMapper, PmsWallet
 
   @Override
   public WalletMoneyDto number(WalletParam request) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
+      Asserts.fail("用户不能为空");
+    }
     WalletMoneyDto walletMoneyDto = new WalletMoneyDto();
     // 获取余额
-    PmsWallet wallet = lambdaQuery().eq(PmsWallet::getUid, request.getUid()).one();
+    PmsWallet wallet = lambdaQuery().eq(PmsWallet::getUid, uid).one();
     walletMoneyDto.setMoney(Optional.ofNullable(wallet).map(PmsWallet::getMoney).orElse("0.00"));
     // 获取待结算订单数和金额
     List<OmsOrder> list =
         new LambdaQueryChainWrapper<>(omsOrderService.getBaseMapper())
-            .eq(OmsOrder::getUid, request.getUid())
+            .eq(OmsOrder::getUid, uid)
             .eq(OmsOrder::getStatus, OrderStatus.COMPLETE.getCode())
             .list();
     walletMoneyDto.setSettleOrderNum(list.size());
@@ -67,7 +73,7 @@ public class PmsWalletServiceImpl extends ServiceImpl<PmsWalletMapper, PmsWallet
                 pmsWalletRecordService.getMap(
                     new QueryWrapper<PmsWalletRecord>()
                         .select("CAST(SUM(money) as DECIMAL (16, 2)) AS totalMoney")
-                        .eq("uid", request.getUid())
+                        .eq("uid", uid)
                         .eq("type", WalletRecordType.CASH_OUT.getCode())
                         .eq("pay_status", WalletPayStatus.SUCCESS)))
             .map(map -> (BigDecimal) map.get("totalMoney"))
@@ -78,13 +84,13 @@ public class PmsWalletServiceImpl extends ServiceImpl<PmsWalletMapper, PmsWallet
 
   @Override
   public PmsWallet info(WalletParam request) {
-    return lambdaQuery().eq(PmsWallet::getUid, request.getUid()).one();
+    return lambdaQuery().eq(PmsWallet::getUid, RequestHolder.getUid()).one();
   }
 
   @Override
   public Object modify(WalletParam request) {
     LambdaUpdateChainWrapper<PmsWallet> wrapper =
-        lambdaUpdate().eq(PmsWallet::getUid, request.getUid());
+        lambdaUpdate().eq(PmsWallet::getUid, RequestHolder.getUid());
     if (ObjectUtil.isNotEmpty(request.getBank())) {
       wrapper.set(PmsWallet::getBank, request.getBank());
       wrapper.set(PmsWallet::getBankName, request.getBankName());

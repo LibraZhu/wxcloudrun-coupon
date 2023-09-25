@@ -28,9 +28,10 @@ public interface DYService extends IService<OmsOrder> {
    * 公众号链接转链回复
    *
    * @param request 微信消息
+   * @param uid
    * @return 微信回复消息
    */
-  Object wxMessage(WxMessageRequest request);
+  Object wxMessage(WxMessageRequest request, Long uid);
 
   /**
    * 榜单商品列表

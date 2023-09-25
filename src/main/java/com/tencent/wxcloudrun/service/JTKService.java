@@ -2,9 +2,9 @@ package com.tencent.wxcloudrun.service;
 
 public interface JTKService {
 
-  Object getMeituanLink(Integer type);
+  Object getMeituanLink();
 
-  Object getEleLink(Integer type);
+  Object getEleLink();
 
   Object getUnionLink(Integer type);
 }

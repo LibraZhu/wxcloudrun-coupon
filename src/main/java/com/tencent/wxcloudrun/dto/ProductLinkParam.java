@@ -23,7 +23,4 @@ public class ProductLinkParam {
 
   @ApiModelProperty(value = "商品搜索id")
   private String searchId;
-
-  @ApiModelProperty(value = "用户标识")
-  private String uid;
 }

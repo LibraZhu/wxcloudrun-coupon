@@ -11,6 +11,7 @@ import com.tencent.wxcloudrun.dto.ProductLinkParam;
 import com.tencent.wxcloudrun.dto.ProductQueryParam;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.service.*;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -32,7 +33,7 @@ public class ProductServiceImpl implements ProductService {
   public List<HJKJDProduct> searchLink(ProductQueryParam param) {
     if (param.getKeyword().startsWith("https://item.m.jd.com")
         || param.getKeyword().startsWith("https://item.jd.com")) {
-      CommonPage<HJKJDProduct> page = jdService.searchHJKProduct(param);
+      CommonPage<HJKJDProduct> page = jdService.searchProduct(param);
       if (ObjectUtil.isEmpty(page.getList())) {
         Asserts.fail(ResultCode.NO_PRODUCT);
       }
@@ -62,7 +63,11 @@ public class ProductServiceImpl implements ProductService {
         || param.getKeyword().contains("detail.tmall.com")) {
       String content = URLDecoder.decode(param.getKeyword(), StandardCharsets.UTF_8);
       String id = content.substring(content.indexOf("id=") + 3).split("&")[0];
-      return Collections.singletonList(tbService.getProductDetail(id));
+      HJKJDProduct product = tbService.getProductDetail(id);
+      if(product==null) {
+        Asserts.fail(ResultCode.NO_PRODUCT);
+      }
+      return Collections.singletonList(product);
     } else if (param.getKeyword().contains("v.douyin.com")) {
       Matcher matcher =
           Pattern.compile(Pattern.quote("【") + "(.*?)" + Pattern.quote("】"))
@@ -70,6 +75,7 @@ public class ProductServiceImpl implements ProductService {
       if (matcher.find()) {
         String keyword = matcher.group(1).trim();
         param.setKeyword(keyword);
+        param.setUid(RequestHolder.getUid());
         CommonPage<HJKJDProduct> page = dyService.searchProduct(param);
         if (ObjectUtil.isEmpty(page.getList())) {
           Asserts.fail(ResultCode.NO_PRODUCT);
@@ -101,9 +107,10 @@ public class ProductServiceImpl implements ProductService {
       return wpService.searchProduct(param);
     }
     if (ObjectUtil.equals(param.getSource(), ProductSource.DY.getCode())) {
+      param.setUid(RequestHolder.getUid());
       return dyService.searchProduct(param);
     }
-    return jdService.searchHJKProduct(param);
+    return jdService.searchProduct(param);
   }
 
   @Override
@@ -112,6 +119,7 @@ public class ProductServiceImpl implements ProductService {
       return pddService.searchProduct(param);
     }
     if (ObjectUtil.equals(param.getSource(), ProductSource.TB.getCode())) {
+      param.setIsTmall(true);
       return tbService.searchProduct(param);
     }
     if (ObjectUtil.equals(param.getSource(), ProductSource.WPH.getCode())) {
@@ -135,26 +143,28 @@ public class ProductServiceImpl implements ProductService {
       return wpService.getProductDetail(param.getProductId());
     }
     if (ObjectUtil.equals(param.getSource(), ProductSource.DY.getCode())) {
-      return dyService.getProductDetail(param.getProductId(), param.getUid());
+      return dyService.getProductDetail(param.getProductId(), RequestHolder.getUid());
     }
-    return jdService.getHJKProductDetail(param.getProductId());
+    return jdService.getProductDetail(param.getProductId());
   }
 
   @Override
   public Object link(ProductLinkParam param) {
     if (param.getSource() == ProductSource.PDD.getCode()) {
-      return pddService.getUnionUrl(param.getProductId(), param.getSearchId(), param.getUid());
+      return pddService.getUnionUrl(
+          param.getProductId(), param.getSearchId(), RequestHolder.getUid());
     }
     if (param.getSource() == ProductSource.TB.getCode()) {
-      return tbService.getUnionUrl(param.getProductId(), param.getUid());
+      return tbService.getUnionUrl(param.getProductId(), RequestHolder.getUid());
     }
     if (param.getSource() == ProductSource.WPH.getCode()) {
-      return wpService.getUnionUrl(param.getProductId(), param.getUid());
+      return wpService.getUnionUrl(param.getProductId(), RequestHolder.getUid());
     }
     if (param.getSource() == ProductSource.DY.getCode()) {
-      return dyService.getUnionUrl(param.getProductId(), param.getUid());
+      return dyService.getUnionUrl(param.getProductId(), RequestHolder.getUid());
     }
-    return jdService.getHDKUnionUrl(param.getProductId(), param.getCouponUrl(), param.getUid());
+    return jdService.getUnionUrl(
+        param.getProductId(), param.getCouponUrl(), RequestHolder.getUid());
   }
 
   @Override

@@ -6,5 +6,5 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class HJKJDProductDetailResponse extends HJKResponse {
-  private HJKJDProduct data;
+  private Object data;
 }

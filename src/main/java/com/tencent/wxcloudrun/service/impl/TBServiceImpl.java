@@ -5,7 +5,6 @@ import cn.hutool.core.net.URLDecoder;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.pdd.pop.sdk.common.util.JsonUtil;
 import com.taobao.api.DefaultTaobaoClient;
 import com.taobao.api.request.TbkDgMaterialOptionalRequest;
 import com.taobao.api.request.TbkDgOptimusMaterialRequest;
@@ -23,6 +22,7 @@ import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.model.UmsUserTb;
 import com.tencent.wxcloudrun.service.TBService;
 import com.tencent.wxcloudrun.service.UmsUserTbService;
+import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
@@ -99,7 +99,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           new HashMap<String, Object>() {
             {
               put("apikey", hjkProperties.getApiKey());
-              put("query_type", 1);
+              put("query_type", 4);
               put("start_time", startTime);
               put("end_time", endTime);
               put("position_index", positionIndex);
@@ -114,15 +114,14 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           env,
           "Method:[{}],Request:{},Response:{}",
           "SyncTBOrder",
-          JsonUtil.transferToJson(map),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(map),
+          JsonUtil.toJson(response));
       if (response == null || response.getData() == null) {
         return;
       }
       if (response.getData() instanceof Map) {
         HJKTBOrderResponse.OrderPage orderPage =
-            JsonUtil.transferToObj(
-                JsonUtil.transferToJson(response.getData()), HJKTBOrderResponse.OrderPage.class);
+            JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBOrderResponse.OrderPage.class);
 
         if (ObjectUtil.isNotNull(orderPage.getResults())
             && ObjectUtil.isNotEmpty(orderPage.getResults().getPublisher_order_dto())) {
@@ -212,7 +211,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
               startTime,
               endTime,
               page,
-              JsonUtil.transferToJson(list));
+              JsonUtil.toJson(list));
 
           getUidBySpecialId(sidList);
         }
@@ -264,7 +263,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public Object wxMessage(WxMessageRequest request) {
+  public Object wxMessage(WxMessageRequest request, Long uid) {
     if (request.getContent().contains("m.tb.cn")) {
       Matcher matcher =
           Pattern.compile(Pattern.quote("「") + "(.*?)" + Pattern.quote("」"))
@@ -280,25 +279,19 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           wxMessage.setFromUserName(request.getToUserName());
           wxMessage.setToUserName(request.getFromUserName());
           wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-          wxMessage.setMsgType("text");
-          String content = "券后价:" + product.getPrice_after() + " 约返:" + product.getRebate() + "\n";
-          content = content + "◇ " + product.getGoods_name() + "\n";
-          content =
-              content
-                  + String.format(
-                      "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                          + "data-miniprogram-path=\"pages/product/index?id=%s&type=3\">点我马上购买</a>",
-                      product.getGoods_id());
-          if (page.getList().size() > 1) {
-            content =
-                content
-                    + "\n\n"
-                    + String.format(
-                        "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                            + "data-miniprogram-path=\"pages/search/list/index?keyword=%s&type=3\">查看相似商品</a>",
-                        keyword);
-          }
-          wxMessage.setContent(content);
+          wxMessage.setMsgType("news");
+          wxMessage.setArticleCount(1);
+          WxMessage.Articles articles = new WxMessage.Articles();
+          articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
+          articles.setDescription(product.getGoods_name());
+          articles.setPicUrl(product.getPicurl());
+          HJKTBLinkResponse.TbLink item =
+              (HJKTBLinkResponse.TbLink) getUnionUrl(product.getGoods_id(), uid.toString());
+          articles.setUrl(
+              Optional.ofNullable(item)
+                  .map(HJKTBLinkResponse.TbLink::getCouponClickUrl)
+                  .orElse(""));
+          wxMessage.setArticles(Collections.singletonList(articles));
           return wxMessage;
         }
       }
@@ -312,16 +305,17 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         wxMessage.setFromUserName(request.getToUserName());
         wxMessage.setToUserName(request.getFromUserName());
         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("text");
-        String content = "券后价:" + product.getPrice_after() + " 约返:" + product.getRebate() + "\n";
-        content = content + "◇ " + product.getGoods_name() + "\n";
-        content =
-            content
-                + String.format(
-                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                        + "data-miniprogram-path=\"pages/product/index?id=%s&type=3\">点我马上购买</a>",
-                    product.getGoods_id());
-        wxMessage.setContent(content);
+        wxMessage.setMsgType("news");
+        wxMessage.setArticleCount(1);
+        WxMessage.Articles articles = new WxMessage.Articles();
+        articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
+        articles.setDescription(product.getGoods_name());
+        articles.setPicUrl(product.getPicurl());
+        HJKTBLinkResponse.TbLink item =
+            (HJKTBLinkResponse.TbLink) getUnionUrl(product.getGoods_id(), uid.toString());
+        articles.setUrl(
+            Optional.ofNullable(item).map(HJKTBLinkResponse.TbLink::getCouponClickUrl).orElse(""));
+        wxMessage.setArticles(Collections.singletonList(articles));
         return wxMessage;
       }
     }
@@ -342,8 +336,8 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           env,
           "[{}],Request:{},Response:{}",
           "淘宝商品列表",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
       if (response.getResultList() != null) {
         return CommonPage.page(
             param.getPage(),
@@ -392,6 +386,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       } catch (Exception e) {
                         product.setSalesTip(String.format("月售%d件", item.getVolume()));
                       }
+                      product.setIs_tmall(ObjectUtil.equals(item.getUserType(), 1L));
                       product.setSource(ProductSource.TB.getCode());
                       return product;
                     })
@@ -411,6 +406,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       request.setPageNo(param.getPage());
       request.setPageSize(param.getPageSize());
       request.setPlatform(2L);
+      request.setIsTmall(param.getIsTmall());
       if (ObjectUtil.isNotEmpty(param.getOptId())) {
         switch (param.getOptId().intValue()) {
           case 1:
@@ -456,8 +452,8 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           env,
           "[{}],Request:{},Response:{}",
           "淘宝商品搜索",
-          JsonUtil.transferToJson(request),
-          JsonUtil.transferToJson(response));
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
       if (response.getResultList() != null) {
         return CommonPage.page(
             param.getPage(),
@@ -506,6 +502,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       } catch (Exception e) {
                         product.setSalesTip(String.format("月售%s件", item.getTkTotalSales()));
                       }
+                      product.setIs_tmall(ObjectUtil.equals(item.getUserType(), 1L));
                       product.setSource(ProductSource.TB.getCode());
                       return product;
                     })
@@ -536,10 +533,11 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "淘宝商品详情",
-        JsonUtil.transferToJson(map),
-        JsonUtil.transferToJson(response));
-    if (response != null && response.getData() != null) {
-      HJKTBLinkResponse.TbLink item = response.getData();
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(response));
+    if (response != null && response.getData() != null && response.getData() instanceof Map) {
+      HJKTBLinkResponse.TbLink item =
+          JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBLinkResponse.TbLink.class);
       HJKJDProduct product = new HJKJDProduct();
       product.setGoods_id(item.getItemId());
       product.setGoods_name(item.getTitle());
@@ -583,6 +581,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       } catch (Exception e) {
         product.setSalesTip(String.format("月售%s件", item.getVolume()));
       }
+      product.setIs_tmall(ObjectUtil.equals(item.getUserType(), "1"));
       product.setSource(ProductSource.TB.getCode());
       return product;
     }
@@ -610,10 +609,10 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "[{}],Request:{},Response:{}",
         "淘宝商品转链",
-        JsonUtil.transferToJson(map),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(response));
     if (response != null && response.getData() != null) {
-      return response.getData().getTkl();
+      return response.getData();
     }
     return null;
   }
@@ -637,8 +636,8 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "Method:[{}],Request:{},Response:{}",
         "根据会员id获取uid",
-        JsonUtil.transferToJson(map),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(response));
 
     return Optional.ofNullable(response)
         .map(HJKTBInviterResponse::getData)
@@ -667,8 +666,8 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         env,
         "Method:[{}],Request:{},Response:{}",
         "根据uid获取淘宝会员id",
-        JsonUtil.transferToJson(map),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(response));
     return Optional.ofNullable(response)
         .map(HJKTBInviterResponse::getData)
         .map(HJKTBInviterResponse.TbInviterData::getInviter_list)

@@ -5,8 +5,7 @@ import cn.hutool.core.net.URLDecoder;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.pdd.pop.ext.fasterxml.jackson.core.type.TypeReference;
-import com.pdd.pop.sdk.common.util.JsonUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.HJKProperties;
@@ -17,6 +16,7 @@ import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.WPHService;
+import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
@@ -32,10 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -99,16 +96,16 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         env,
         "Method:[{}],Request:{},Response:{}",
         "SyncWPHOrder",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response != null
         && response.getData() != null
         && response.getData().getOrderInfoList() != null
         && response.getData().getOrderInfoList() instanceof List) {
 
       List<HJKWPHOrder> orderList =
-          JsonUtil.transferToObj(
-              JsonUtil.transferToJson(response.getData().getOrderInfoList()),
+          JsonUtil.toList(
+              JsonUtil.toJson(response.getData().getOrderInfoList()),
               new TypeReference<List<HJKWPHOrder>>() {});
       if (ObjectUtil.isEmpty(orderList)) {
         return;
@@ -176,13 +173,7 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                   })
               .collect(Collectors.toList());
       XLogger.log(
-          logger,
-          env,
-          "同步唯品会订单:[{}~{}],第{}页,{}",
-          startTime,
-          endTime,
-          page,
-          JsonUtil.transferToJson(list));
+          logger, env, "同步唯品会订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.toJson(list));
       if (list.size() > 0) {
         baseMapper.saveOrUpdateList(list);
         // 是否还有更多
@@ -197,7 +188,7 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
   }
 
   @Override
-  public Object wxMessage(WxMessageRequest request) {
+  public Object wxMessage(WxMessageRequest request, Long uid) {
     String reqContent = URLDecoder.decode(request.getContent(), StandardCharsets.UTF_8);
     String goodsId = reqContent.substring(reqContent.indexOf("goodsId=") + 8).split("&")[0];
     if (ObjectUtil.isNotEmpty(goodsId)) {
@@ -207,16 +198,17 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         wxMessage.setFromUserName(request.getToUserName());
         wxMessage.setToUserName(request.getFromUserName());
         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("text");
-        String content = "折扣价:" + product.getPrice_after() + " 约返:" + product.getRebate() + "\n";
-        content = content + "◇ " + product.getGoods_name() + "\n";
-        content =
-            content
-                + String.format(
-                    "<a data-miniprogram-appid=\"wxd612e795c9823faa\" "
-                        + "data-miniprogram-path=\"pages/product/index?id=%s&type=5\">点我马上购买</a>",
-                    product.getGoods_id());
-        wxMessage.setContent(content);
+        wxMessage.setMsgType("news");
+        wxMessage.setArticleCount(1);
+        WxMessage.Articles articles = new WxMessage.Articles();
+        articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
+        articles.setDescription(product.getGoods_name());
+        articles.setPicUrl(product.getPicurl().replace("750x750", "200x200"));
+        HJKWPHLinkResponse.WPHLinkUrlInfo item =
+            (HJKWPHLinkResponse.WPHLinkUrlInfo) getUnionUrl(product.getGoods_id(), uid.toString());
+        articles.setUrl(
+            Optional.ofNullable(item).map(HJKWPHLinkResponse.WPHLinkUrlInfo::getUrl).orElse(""));
+        wxMessage.setArticles(Collections.singletonList(articles));
         return wxMessage;
       }
     }
@@ -255,8 +247,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         env,
         "[{}],Request:{},Response:{}",
         "唯品会商品列表",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response == null) {
       Asserts.fail("服务器异常");
     }
@@ -265,8 +257,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
     }
     if (response.getData().getGoodsInfoList() instanceof List) {
       List<HJKWPHProduct> list =
-          JsonUtil.transferToObj(
-              JsonUtil.transferToJson(response.getData().getGoodsInfoList()),
+          JsonUtil.toList(
+              JsonUtil.toJson(response.getData().getGoodsInfoList()),
               new TypeReference<List<HJKWPHProduct>>() {});
       return CommonPage.page(
           param.getPage(),
@@ -347,8 +339,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         env,
         "[{}],Request:{},Response:{}",
         "唯品会搜索商品",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response == null) {
       Asserts.fail("服务器异常");
     }
@@ -361,8 +353,8 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
 
       if (ObjectUtil.isNotEmpty(goodInfoList)) {
         List<HJKWPHProduct> list =
-            JsonUtil.transferToObj(
-                JsonUtil.transferToJson(goodInfoList), new TypeReference<List<HJKWPHProduct>>() {});
+            JsonUtil.toList(
+                JsonUtil.toJson(goodInfoList), new TypeReference<List<HJKWPHProduct>>() {});
         return CommonPage.page(
             param.getPage(),
             param.getPageSize(),
@@ -434,12 +426,12 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         env,
         "[{}],Request:{},Response:{}",
         "唯品会搜索商品",
-        JsonUtil.transferToJson(searchParams),
-        JsonUtil.transferToJson(response));
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
     if (response.getBody() != null && response.getBody().getData() != null) {
       List<HJKWPHProduct> list =
-          JsonUtil.transferToObj(
-              JsonUtil.transferToJson(response.getBody().getData()),
+          JsonUtil.toList(
+              JsonUtil.toJson(response.getBody().getData()),
               new TypeReference<List<HJKWPHProduct>>() {});
       HJKWPHProduct item = list.get(0);
       HJKJDProduct product = new HJKJDProduct();

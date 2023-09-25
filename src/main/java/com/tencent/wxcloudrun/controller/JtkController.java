@@ -22,21 +22,21 @@ public class JtkController {
   }
 
   @ApiOperation(
-      "美团联盟外卖/酒店/券包活动转链接口。1-外卖 6-酒店活动页 8-外卖品质商家活动 9-美团电商-嗨购节 10-美团电商-超级好物场 11-美团酒店搜索首页 15-美团券包 ")
+      "美团联盟外卖/券包活动转链接口。")
   @GetMapping("/meituan")
   @ResponseBody
-  public CommonResult<Object> meituan(@RequestParam Integer type) {
-    return CommonResult.success(wmService.getMeituanLink(type));
+  public CommonResult<Object> meituan() {
+    return CommonResult.success(wmService.getMeituanLink());
   }
 
-  @ApiOperation("饿了么外卖/生鲜红包活动转链接口。3-饿了么浏览店铺得红包活动（不支持h5推广链接，只支持小程序推广） 4-饿了么外卖活动 5-饿了么新零售（只支持小程序推广）")
+  @ApiOperation("饿了么外卖/红包推广链接。")
   @GetMapping("/ele")
   @ResponseBody
-  public CommonResult<Object> ele(@RequestParam Integer type) {
-    return CommonResult.success(wmService.getEleLink(type));
+  public CommonResult<Object> ele() {
+    return CommonResult.success(wmService.getEleLink());
   }
 
-  @ApiOperation("统一活动转链接口。0-滴滴打车；1-T3; 2-花小猪")
+  @ApiOperation("统一活动转链接口。0-滴滴打车；1-T3; 2-花小猪; 3-电影")
   @GetMapping("/unionLink")
   @ResponseBody
   public CommonResult<Object> unionLink(@RequestParam Integer type) {

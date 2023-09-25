@@ -23,6 +23,7 @@ import com.tencent.wxcloudrun.service.OmsOrderService;
 import com.tencent.wxcloudrun.service.PmsWalletLogService;
 import com.tencent.wxcloudrun.service.PmsWalletRecordService;
 import com.tencent.wxcloudrun.service.PmsWalletService;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +53,10 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
   @Override
   @Transactional
   public Object settle(WalletSettleParam request) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
+      Asserts.fail("用户不能为空");
+    }
     // 获取订单对应的返利总额
     BigDecimal totalRebate =
         Optional.ofNullable(
@@ -74,18 +79,18 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
     record.setCreateTime(createTime);
     record.setSettlePeriod(request.getPeriod());
     record.setSettleOrderId(String.join(",", request.getOrderIds()));
-    record.setUid(Long.valueOf(request.getUid()));
+    record.setUid(Long.valueOf(uid));
     record.setRemark(request.getRemark());
     this.save(record);
     // 查询余额
     PmsWallet pmsWallet =
         new LambdaQueryChainWrapper<>(pmsWalletService.getBaseMapper())
-            .eq(PmsWallet::getUid, request.getUid())
+            .eq(PmsWallet::getUid, uid)
             .oneOpt()
             .orElseGet(
                 () -> {
                   PmsWallet wallet = new PmsWallet();
-                  wallet.setUid(Long.valueOf(request.getUid()));
+                  wallet.setUid(Long.valueOf(uid));
                   return wallet;
                 });
     // 将结算的返利累加到余额
@@ -99,7 +104,7 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
     // 添加一条变更日志
     PmsWalletLog log = new PmsWalletLog();
     log.setRecordSn(recordSn);
-    log.setUid(Long.valueOf(request.getUid()));
+    log.setUid(Long.valueOf(uid));
     log.setChangeMoney(String.format("+%s", totalRebate));
     log.setMoney(moneyAfter);
     log.setDes("结算");
@@ -111,15 +116,19 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
   @Override
   @Transactional
   public Object cash(WalletCashParam request) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
+      Asserts.fail("用户不能为空");
+    }
     // 查询余额
     PmsWallet pmsWallet =
         new LambdaQueryChainWrapper<>(pmsWalletService.getBaseMapper())
-            .eq(PmsWallet::getUid, request.getUid())
+            .eq(PmsWallet::getUid, uid)
             .oneOpt()
             .orElseGet(
                 () -> {
                   PmsWallet wallet = new PmsWallet();
-                  wallet.setUid(Long.valueOf(request.getUid()));
+                  wallet.setUid(Long.valueOf(uid));
                   return wallet;
                 });
     BigDecimal cashMoney = new BigDecimal(request.getMoney()).setScale(2, RoundingMode.DOWN);
@@ -138,7 +147,7 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
     record.setPayStatus(WalletPayStatus.NO.getCode());
     LocalDateTime createTime = LocalDateTime.now();
     record.setCreateTime(createTime);
-    record.setUid(Long.valueOf(request.getUid()));
+    record.setUid(Long.valueOf(uid));
     this.save(record);
     // 将提现的金额从余额扣除
     String moneyAfter = money.subtract(cashMoney).toString();
@@ -151,7 +160,7 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
     // 添加一条变更日志
     PmsWalletLog log = new PmsWalletLog();
     log.setRecordSn(recordSn);
-    log.setUid(Long.valueOf(request.getUid()));
+    log.setUid(Long.valueOf(uid));
     log.setChangeMoney(String.format("-%s", cashMoney));
     log.setMoney(moneyAfter);
     log.setDes("提现");
@@ -162,23 +171,32 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
 
   @Override
   public Object cashConfirm(WalletCashConfirmParam request) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
+      Asserts.fail("用户不能为空");
+    }
     return lambdaUpdate()
         .set(PmsWalletRecord::getPayStatus, WalletPayStatus.SUCCESS.getCode())
         .set(PmsWalletRecord::getPayTime, LocalDateTime.now())
         .eq(PmsWalletRecord::getRecordSn, request.getRecordSn())
         .eq(PmsWalletRecord::getType, WalletRecordType.CASH_OUT.getCode())
-        .eq(PmsWalletRecord::getUid, request.getUid())
+        .eq(PmsWalletRecord::getUid, uid)
         .update();
   }
 
   @Override
   @Transactional
   public Object cashFail(WalletCashConfirmParam request) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
+      Asserts.fail("用户不能为空");
+    }
     PmsWalletRecord record =
         lambdaQuery()
             .eq(PmsWalletRecord::getRecordSn, request.getRecordSn())
             .eq(PmsWalletRecord::getType, WalletRecordType.CASH_OUT.getCode())
-            .eq(PmsWalletRecord::getUid, request.getUid())
+            .eq(PmsWalletRecord::getUid, uid)
+            .orderByDesc(PmsWalletRecord::getCreateTime)
             .one();
     if (record == null) {
       Asserts.fail("提现记录不存在");
@@ -192,12 +210,12 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
     // 钱包金额变更, 目前结算和提现不是并发，不存在金额更新不正确问题。后续如果有并发，添加表行锁。
     PmsWallet pmsWallet =
         new LambdaQueryChainWrapper<>(pmsWalletService.getBaseMapper())
-            .eq(PmsWallet::getUid, request.getUid())
+            .eq(PmsWallet::getUid, uid)
             .oneOpt()
             .orElseGet(
                 () -> {
                   PmsWallet wallet = new PmsWallet();
-                  wallet.setUid(Long.valueOf(request.getUid()));
+                  wallet.setUid(Long.valueOf(uid));
                   return wallet;
                 });
     String moneyAfter =
@@ -207,7 +225,7 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
     // 添加一条变更日志
     PmsWalletLog log = new PmsWalletLog();
     log.setRecordSn(record.getRecordSn());
-    log.setUid(Long.valueOf(request.getUid()));
+    log.setUid(Long.valueOf(uid));
     log.setChangeMoney(String.format("+%s", record.getMoney()));
     log.setMoney(moneyAfter);
     log.setDes("提现失败");
@@ -218,27 +236,31 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
 
   @Override
   public CommonPage<PmsWalletRecord> settleList(PageParam request) {
-    if (ObjectUtil.isEmpty(request.getUid())) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
       Asserts.fail("用户不能为空");
     }
     Page<PmsWalletRecord> page =
         lambdaQuery()
-            .eq(PmsWalletRecord::getUid, request.getUid())
+            .eq(PmsWalletRecord::getUid, uid)
             .eq(PmsWalletRecord::getType, WalletRecordType.SETTLE.getCode())
             .eq(PmsWalletRecord::getPayStatus, WalletPayStatus.SUCCESS)
+            .orderByDesc(PmsWalletRecord::getCreateTime)
             .page(Page.of(request.getPage(), request.getPageSize()));
     return CommonPage.page(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords());
   }
 
   @Override
   public CommonPage<PmsWalletRecord> cashList(PageParam request) {
-    if (ObjectUtil.isEmpty(request.getUid())) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
       Asserts.fail("用户不能为空");
     }
     Page<PmsWalletRecord> page =
         lambdaQuery()
-            .eq(PmsWalletRecord::getUid, request.getUid())
+            .eq(PmsWalletRecord::getUid, uid)
             .eq(PmsWalletRecord::getType, WalletRecordType.CASH_OUT.getCode())
+            .orderByDesc(PmsWalletRecord::getCreateTime)
             .page(Page.of(request.getPage(), request.getPageSize()));
     return CommonPage.page(
         page.getCurrent(),
@@ -253,7 +275,10 @@ public class PmsWalletRecordServiceImpl extends ServiceImpl<PmsWalletRecordMappe
                                 account -> {
                                   if (record.getPayType() == WalletPayType.BANK.getCode()) {
                                     String[] temp = account.split(",");
-                                    temp[0] = temp[0].length()>4?"****"+temp[0].substring(temp[0].length()-4):temp[0];
+                                    temp[0] =
+                                        temp[0].length() > 4
+                                            ? "****" + temp[0].substring(temp[0].length() - 4)
+                                            : temp[0];
                                     return String.join(",", temp);
                                   } else {
                                     return account;

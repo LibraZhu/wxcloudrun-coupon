@@ -9,6 +9,7 @@ import com.tencent.wxcloudrun.dao.PmsWalletLogMapper;
 import com.tencent.wxcloudrun.dto.PageParam;
 import com.tencent.wxcloudrun.model.PmsWalletLog;
 import com.tencent.wxcloudrun.service.PmsWalletLogService;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,13 +24,15 @@ public class PmsWalletLogServiceImpl extends ServiceImpl<PmsWalletLogMapper, Pms
 
   @Override
   public CommonPage<PmsWalletLog> listLog(PageParam request) {
-    if (ObjectUtil.isEmpty(request.getUid())) {
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
       Asserts.fail("用户不能为空");
     }
     Page<PmsWalletLog> page =
         lambdaQuery()
-            .eq(PmsWalletLog::getUid, request.getUid())
+            .eq(PmsWalletLog::getUid, uid)
             .eq(PmsWalletLog::getDisplay, 1)
+            .orderByDesc(PmsWalletLog::getCreateTime)
             .page(Page.of(request.getPage(), request.getPageSize()));
     return CommonPage.page(page.getCurrent(), page.getSize(), page.getTotal(), page.getRecords());
   }

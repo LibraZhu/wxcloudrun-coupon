@@ -12,10 +12,6 @@ public class WalletCashConfirmParam {
   @NotBlank(message = "流水号不能为空")
   private String recordSn;
 
-  @ApiModelProperty(value = "用户标识")
-  @NotBlank(message = "用户不能为空")
-  private String uid;
-
   @ApiModelProperty(value = "备注")
   private String remark;
 }

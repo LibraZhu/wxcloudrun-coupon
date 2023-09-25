@@ -19,10 +19,6 @@ public class WalletSettleParam {
   @NotBlank(message = "结算日期不能为空")
   private String period;
 
-  @ApiModelProperty(value = "用户标识")
-  @NotBlank(message = "用户不能为空")
-  private String uid;
-
   @ApiModelProperty(value = "备注")
   private String remark;
 }
