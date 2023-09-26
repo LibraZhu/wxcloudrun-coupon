@@ -291,7 +291,23 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
               Optional.ofNullable(item)
                   .map(HJKTBLinkResponse.TbLink::getCouponClickUrl)
                   .orElse(""));
-          wxMessage.setArticles(Collections.singletonList(articles));
+          if (page.getList().size() > 1) {
+            wxMessage.setArticleCount(2);
+            WxMessage.Articles articlesMore = new WxMessage.Articles();
+            articlesMore.setDescription("更多相似商品");
+            articlesMore.setPicUrl(product.getPicurl());
+            articles.setUrl(
+                "https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com/#/search/list?type=3&uid="
+                    + uid
+                    + "&keyword="
+                    + product.getGoods_name());
+            ArrayList<WxMessage.Articles> list = new ArrayList<>();
+            list.add(articles);
+            list.add(articlesMore);
+            wxMessage.setArticles(list);
+          } else {
+            wxMessage.setArticles(Collections.singletonList(articles));
+          }
           return wxMessage;
         }
       }
@@ -612,7 +628,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         JsonUtil.toJson(map),
         JsonUtil.toJson(response));
     if (response != null && response.getData() != null) {
-      return response.getData();
+      return JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBLinkResponse.TbLink.class);
     }
     return null;
   }

@@ -4,7 +4,6 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.DYProperties;
@@ -15,6 +14,7 @@ import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.DYService;
+import com.tencent.wxcloudrun.utils.JsonUtil;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
@@ -211,7 +211,23 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             (HJKJDProduct) getUnionUrl(product.getGoods_id(), uid.toString());
         articles.setUrl(
             Optional.ofNullable(hjkjdProduct).map(HJKJDProduct::getClick_url).orElse(""));
-        wxMessage.setArticles(Collections.singletonList(articles));
+        if (page.getList().size() > 1) {
+          wxMessage.setArticleCount(2);
+          WxMessage.Articles articlesMore = new WxMessage.Articles();
+          articlesMore.setDescription("更多相似商品");
+          articlesMore.setPicUrl(product.getPicurl());
+          articles.setUrl(
+              "https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com/#/search/list?type=3&uid="
+                  + uid
+                  + "&keyword="
+                  + product.getGoods_name());
+          ArrayList<WxMessage.Articles> list = new ArrayList<>();
+          list.add(articles);
+          list.add(articlesMore);
+          wxMessage.setArticles(list);
+        } else {
+          wxMessage.setArticles(Collections.singletonList(articles));
+        }
         return wxMessage;
       }
     }

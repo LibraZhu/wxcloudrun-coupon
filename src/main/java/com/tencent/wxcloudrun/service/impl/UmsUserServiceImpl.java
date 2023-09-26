@@ -85,6 +85,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
                   + umsUser.getId());
           wxMessage.setArticles(Collections.singletonList(articles));
         }
+        message = wxMessage;
       }
     }
     logger.info(
