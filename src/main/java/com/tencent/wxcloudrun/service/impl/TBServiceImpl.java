@@ -294,9 +294,10 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           if (page.getList().size() > 1) {
             wxMessage.setArticleCount(2);
             WxMessage.Articles articlesMore = new WxMessage.Articles();
+            articlesMore.setTitle("更多相似商品");
             articlesMore.setDescription("更多相似商品");
             articlesMore.setPicUrl(product.getPicurl());
-            articles.setUrl(
+            articlesMore.setUrl(
                 "https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com/#/search/list?type=3&uid="
                     + uid
                     + "&keyword="
