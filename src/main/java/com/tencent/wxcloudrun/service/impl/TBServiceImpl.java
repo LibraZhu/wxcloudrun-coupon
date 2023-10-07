@@ -281,7 +281,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
         if (ObjectUtil.isEmpty(page.getList())) {
           wxMessage.setMsgType("text");
-          wxMessage.setContent("很遗憾，没有找到该商品的优惠券");
+          wxMessage.setContent("很遗憾，没有找到该商品的优惠");
         }
         if (page.getList().stream()
             .anyMatch(item -> request.getContent().contains(item.getGoods_name()))) {
