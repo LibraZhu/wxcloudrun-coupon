@@ -294,13 +294,13 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           articles.setPicUrl(product.getPicurl());
           if (page.getList().size() > 1) {
             articles.setUrl(
-                "https://coupon-h5.pages.dev/#/search/list?type=3&uid="
+                "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/list?type=3&uid="
                     + uid
                     + "&keyword="
                     + product.getGoods_name());
           } else {
             articles.setUrl(
-                "https://coupon-h5.pages.dev/#/product/detail?type=3&uid="
+                "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/product/detail?type=3&uid="
                     + uid
                     + "&id="
                     + product.getGoods_id());
@@ -316,7 +316,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           articles.setDescription("查看类似商品");
           articles.setPicUrl(product.getPicurl());
           articles.setUrl(
-              "https://coupon-h5.pages.dev/#/search/list?type=4&uid="
+              "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/list?type=4&uid="
                   + uid
                   + "&keyword="
                   + product.getGoods_name());
@@ -341,7 +341,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         articles.setDescription(product.getGoods_name());
         articles.setPicUrl(product.getPicurl());
         articles.setUrl(
-            "https://coupon-h5.pages.dev/#/product/detail?type=3&uid="
+            "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/product/detail?type=3&uid="
                 + uid
                 + "&id="
                 + product.getGoods_id());

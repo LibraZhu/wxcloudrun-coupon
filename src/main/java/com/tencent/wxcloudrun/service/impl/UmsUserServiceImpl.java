@@ -72,7 +72,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         articles.setTitle("找券返");
         articles.setDescription("专属查返利");
         articles.setPicUrl("");
-        articles.setUrl("https://coupon-h5.pages.dev/#/search/index?uid=" + umsUser.getId());
+        articles.setUrl("https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid=" + umsUser.getId());
         wxMessage.setArticles(Collections.singletonList(articles));
 
       } else if (ObjectUtil.equals(request.getContent(), "提现")) {
@@ -97,7 +97,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
           articles.setTitle("账户余额: " + money);
           articles.setDescription("点击提交申请");
           articles.setPicUrl("");
-          articles.setUrl("https://coupon-h5.pages.dev/#/wallet/index?uid=" + umsUser.getId());
+          articles.setUrl("https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/wallet/index?uid=" + umsUser.getId());
           wxMessage.setArticles(Collections.singletonList(articles));
         }
         message = wxMessage;

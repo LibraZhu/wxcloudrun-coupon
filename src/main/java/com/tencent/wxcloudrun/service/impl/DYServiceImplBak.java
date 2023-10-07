@@ -213,13 +213,13 @@ public class DYServiceImplBak extends ServiceImpl<OmsOrderMapper, OmsOrder> impl
         articles.setPicUrl(product.getPicurl());
         if (page.getList().size() > 1) {
           articles.setUrl(
-              "https://coupon-h5.pages.dev/#/search/list?type=4&uid="
+              "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/list?type=4&uid="
                   + uid
                   + "&keyword="
                   + product.getGoods_name());
         } else {
           articles.setUrl(
-              "https://coupon-h5.pages.dev/#/product/detail?type=4&uid="
+              "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/product/detail?type=4&uid="
                   + uid
                   + "&id="
                   + product.getGoods_id());
