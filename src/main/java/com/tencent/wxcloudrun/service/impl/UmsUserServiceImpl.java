@@ -44,7 +44,10 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
   public Object userMessage(WxMessageRequest request) {
     UmsUser umsUser = loginG(null, request.getFromUserName());
     Object message = "success";
-    if (ObjectUtil.isNotNull(umsUser) && StrUtil.equals("text", request.getMsgType())) {
+    if (ObjectUtil.isNull(umsUser)) {
+      return message;
+    }
+    if (StrUtil.equals("text", request.getMsgType())) {
       if (request.getContent().startsWith("https://item.m.jd.com")
           || request.getContent().startsWith("https://item.jd.com")) {
         message = jdService.wxMessage(request, umsUser.getId());
@@ -58,6 +61,20 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         message = dyService.wxMessage(request, umsUser.getId());
       } else if (request.getContent().contains("t.vip.com")) {
         message = wpService.wxMessage(request, umsUser.getId());
+      } else if (ObjectUtil.equals(request.getContent(), "找券返")) {
+        WxMessage wxMessage = new WxMessage();
+        wxMessage.setFromUserName(request.getToUserName());
+        wxMessage.setToUserName(request.getFromUserName());
+        wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+        wxMessage.setMsgType("news");
+        wxMessage.setArticleCount(1);
+        WxMessage.Articles articles = new WxMessage.Articles();
+        articles.setTitle("找券返");
+        articles.setDescription("专属查返利");
+        articles.setPicUrl("");
+        articles.setUrl("https://coupon-h5.pages.dev/#/search/index?uid=" + umsUser.getId());
+        wxMessage.setArticles(Collections.singletonList(articles));
+
       } else if (ObjectUtil.equals(request.getContent(), "提现")) {
         WxMessage wxMessage = new WxMessage();
         wxMessage.setFromUserName(request.getToUserName());
@@ -80,9 +97,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
           articles.setTitle("账户余额: " + money);
           articles.setDescription("点击提交申请");
           articles.setPicUrl("");
-          articles.setUrl(
-              "https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com/#/wallet/index?uid="
-                  + umsUser.getId());
+          articles.setUrl("https://coupon-h5.pages.dev/#/wallet/index?uid=" + umsUser.getId());
           wxMessage.setArticles(Collections.singletonList(articles));
         }
         message = wxMessage;
@@ -91,7 +106,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
     logger.info(
         "[{}],Uid:{},Request:{},Response:{}",
         "公众号消息查询",
-        umsUser == null ? "" : umsUser.getId(),
+        umsUser.getId(),
         JsonUtil.toJson(request),
         ObjectUtil.equals(message, "success") ? "success" : JsonUtil.toJson(message));
     return message;

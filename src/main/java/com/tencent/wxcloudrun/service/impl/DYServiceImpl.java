@@ -14,9 +14,7 @@ import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.ProductSource;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.service.DYService;
-import com.tencent.wxcloudrun.utils.JsonUtil;
-import com.tencent.wxcloudrun.utils.RestTemplateUtil;
-import com.tencent.wxcloudrun.utils.XLogger;
+import com.tencent.wxcloudrun.utils.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -73,21 +71,25 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   private void syncOrderPage(Integer page, String startTime, String endTime) {
-    String api = jtkProperties.getApiUrl() + "/douyin/orders";
+    String api =
+        "https://openapiv2.dataoke.com/open-api/tiktok/order-list"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&order_type={order_type}&date_type={date_type}&start_time={start_time}&end_time={end_time}&page={page}&pageSize={pageSize}";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
           {
-            put("apikey", jtkProperties.getApiKey());
-            put("query_type", 1);
+            put("order_type", 1);
+            put("date_type", 4);
             put("start_time", startTime);
             put("end_time", endTime);
             put("page", page);
-            put("pageSize", 20);
+            put("pageSize", 50);
           }
         };
 
-    JTKDYOrderResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, searchParams, JTKDYOrderResponse.class);
+    DTKDYOrderResponse response =
+        RestTemplateUtil.getInstance()
+            .getForObject(api, DTKDYOrderResponse.class, DTKUtil.sign(searchParams));
     XLogger.log(
         logger,
         env,
@@ -98,159 +100,189 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     if (response == null || response.getData() == null) {
       return;
     }
-    if (response.getData() instanceof Map) {
-      JTKDYOrderResponse.DataDTO dataDTO =
-          JsonUtil.toObj(JsonUtil.toJson(response.getData()), JTKDYOrderResponse.DataDTO.class);
-      if (ObjectUtil.isNotEmpty(dataDTO.getData())) {
-        List<OmsOrder> list =
-            dataDTO.getData().stream()
-                .map(
-                    (item) -> {
-                      OmsOrder order = new OmsOrder();
-                      order.setOrderSource(ProductSource.DY.getCode());
-                      order.setOrderId(item.getOrderId());
-                      order.setOrderSn(item.getOrderId());
-                      order.setOrderEmt(2);
-                      if (ObjectUtil.isNotEmpty(item.getPaySuccessTime())) {
-                        order.setOrderTime(
-                            LocalDateTime.parse(
-                                item.getPaySuccessTime(),
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                      }
-                      if (ObjectUtil.isNotEmpty(item.getUpdateTime())
-                          && ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
-                        order.setFinishTime(
-                            LocalDateTime.parse(
-                                item.getUpdateTime(),
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                      }
-                      if (ObjectUtil.isNotEmpty(item.getUpdateTime())) {
-                        order.setModifyTime(
-                            LocalDateTime.parse(
-                                item.getUpdateTime(),
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                      }
-                      if (ObjectUtil.isNotEmpty(item.getSettleTime())) {
-                        order.setSettleTime(
-                            LocalDateTime.parse(
-                                item.getSettleTime(),
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                      }
-                      order.setSkuId(item.getProductId());
-                      order.setSkuName(item.getProductName());
-                      order.setSkuNum(Long.valueOf(item.getItemNum()));
-                      order.setImageUrl(item.getProductImg());
-                      order.setPrice(item.getTotalPayAmount());
-                      order.setCommissionRate(item.getJtkShareRate());
-                      order.setActualCosPrice(item.getTotalPayAmount());
-                      order.setActualFee(item.getJtkShareFee());
-                      if (ObjectUtil.equals(item.getFlowPoint(), "PAY_SUCC")) {
-                        order.setStatus(OrderStatus.DELIVER.getCode());
-                      } else if (ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
-                        order.setStatus(OrderStatus.COMPLETE.getCode());
-                      } else if (ObjectUtil.equals(item.getFlowPoint(), "REFUND")) {
-                        order.setStatus(OrderStatus.INVALID.getCode());
-                        order.setStatusDes("退款");
-                      }
-                      order.setUid(item.getSid());
-                      order.setRate(dyProperties.getRate());
-                      // 金额小于0.02不算返利
-                      order.setRebate(
-                          new BigDecimal(item.getJtkShareFee()).compareTo(new BigDecimal("0.02"))
-                                  >= 1
-                              ? new BigDecimal(order.getActualFee())
-                                  .multiply(new BigDecimal(order.getRate()))
-                                  .setScale(2, RoundingMode.DOWN)
-                                  .toString()
-                              : "0.00");
-                      return order;
-                    })
-                .collect(Collectors.toList());
-        XLogger.log(
-            logger, env, "同步抖音订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.toJson(list));
-        if (list.size() > 0) {
-          baseMapper.saveOrUpdateList(list);
-        }
+    DTKDYOrderResponse.DataDTO dataDTO = response.getData();
+    if (ObjectUtil.isNotEmpty(dataDTO.getList())) {
+      List<OmsOrder> list =
+          dataDTO.getList().stream()
+              .map(
+                  item -> {
+                    OmsOrder order = new OmsOrder();
+                    order.setOrderSource(ProductSource.DY.getCode());
+                    order.setOrderId(item.getOrderId());
+                    order.setOrderSn(item.getOrderId());
+                    order.setOrderEmt(2);
+                    if (ObjectUtil.isNotEmpty(item.getPaySuccessTime())) {
+                      order.setOrderTime(
+                          LocalDateTime.parse(
+                              item.getPaySuccessTime(),
+                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    }
+                    if (ObjectUtil.isNotEmpty(item.getUpdateTime())
+                        && ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
+                      order.setFinishTime(
+                          LocalDateTime.parse(
+                              item.getUpdateTime(),
+                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    }
+                    if (ObjectUtil.isNotEmpty(item.getUpdateTime())) {
+                      order.setModifyTime(
+                          LocalDateTime.parse(
+                              item.getUpdateTime(),
+                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    }
+                    if (ObjectUtil.isNotEmpty(item.getSettleTime())) {
+                      order.setSettleTime(
+                          LocalDateTime.parse(
+                              item.getSettleTime(),
+                              DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                    }
+                    order.setSkuId(item.getProductId());
+                    order.setSkuName(item.getProductName());
+                    order.setSkuNum(Long.valueOf(item.getItemNum()));
+                    order.setImageUrl(item.getProductImg());
+                    order.setPrice(item.getTotalPayAmount().toString());
+                    order.setCommissionRate(item.getCommissionRate().toString());
+                    order.setEstimateCosPrice(item.getPayGoodsAmount().toString());
+                    order.setEstimateFee(item.getEstimatedTotalCommission().toString());
+                    order.setActualCosPrice(item.getSettledGoodsAmount().toString());
+                    order.setActualFee(item.getRealCommission().toString());
+                    if (ObjectUtil.equals(item.getFlowPoint(), "PAY_SUCC")) {
+                      order.setStatus(OrderStatus.DELIVER.getCode());
+                    } else if (ObjectUtil.equals(item.getFlowPoint(), "CONFIRM")) {
+                      order.setStatus(OrderStatus.COMPLETE.getCode());
+                    } else if (ObjectUtil.equals(item.getFlowPoint(), "REFUND")) {
+                      order.setStatus(OrderStatus.INVALID.getCode());
+                      order.setStatusDes("退款");
+                    }
+                    String[] infos = item.getExternalInfo().split("_");
+                    if (infos.length > 2) {
+                      order.setUid(infos[1]);
+                    } else {
+                      order.setUid(item.getExternalInfo());
+                    }
+                    order.setRate(dyProperties.getRate());
+                    // 先显示预估佣金
+                    BigDecimal commission =
+                        new BigDecimal(item.getEstimatedTotalCommission().toString());
+                    if (ObjectUtil.equals(item.getFlowPoint(), "SETTLE")) {
+                      commission = new BigDecimal(item.getRealCommission().toString());
+                    }
+                    // 金额小于0.02不算返利
+                    order.setRebate(
+                        commission.compareTo(new BigDecimal("0.02")) >= 1
+                            ? commission
+                                .multiply(new BigDecimal(order.getRate()))
+                                .setScale(2, RoundingMode.DOWN)
+                                .toString()
+                            : "0.00");
+                    return order;
+                  })
+              .collect(Collectors.toList());
+      XLogger.log(
+          logger, env, "同步抖音订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.toJson(list));
+      if (list.size() > 0) {
+        baseMapper.saveOrUpdateList(list);
       }
-      if (dataDTO.getLastPage() > dataDTO.getCurrentPage()) {
-        // 下一页
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-        syncOrderPage(page + 1, startTime, endTime);
+    }
+    if (dataDTO.getPage() * 50 < dataDTO.getTotal()) {
+      // 下一页
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
       }
+      syncOrderPage(page + 1, startTime, endTime);
     }
   }
 
   @Override
   public Object wxMessage(WxMessageRequest request, Long uid) {
-    Matcher matcher =
-        Pattern.compile(Pattern.quote("【") + "(.*?)" + Pattern.quote("】"))
-            .matcher(request.getContent());
-    if (matcher.find()) {
-      String keyword = matcher.group(1).trim();
-      ProductQueryParam param = new ProductQueryParam();
-      param.setKeyword(keyword);
-      param.setUid(uid.toString());
-      CommonPage<HJKJDProduct> page = searchProduct(param);
-      if (ObjectUtil.isNotEmpty(page.getList())) {
-        HJKJDProduct product = page.getList().get(0);
-        WxMessage wxMessage = new WxMessage();
-        wxMessage.setFromUserName(request.getToUserName());
-        wxMessage.setToUserName(request.getFromUserName());
-        wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("news");
-        wxMessage.setArticleCount(1);
-        WxMessage.Articles articles = new WxMessage.Articles();
-        articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
-        articles.setDescription(product.getGoods_name());
-        articles.setPicUrl(product.getPicurl());
-        HJKJDProduct hjkjdProduct =
-            (HJKJDProduct) getUnionUrl(product.getGoods_id(), uid.toString());
-        articles.setUrl(
-            Optional.ofNullable(hjkjdProduct).map(HJKJDProduct::getClick_url).orElse(""));
-        if (page.getList().size() > 1) {
-          wxMessage.setArticleCount(2);
-          WxMessage.Articles articlesMore = new WxMessage.Articles();
-          articlesMore.setTitle("更多相似商品");
-          articlesMore.setDescription("更多相似商品");
-          articlesMore.setPicUrl(product.getPicurl());
-          articlesMore.setUrl(
-              "https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com/#/search/list?type=3&uid="
-                  + uid
-                  + "&keyword="
-                  + product.getGoods_name());
-          ArrayList<WxMessage.Articles> list = new ArrayList<>();
-          list.add(articles);
-          list.add(articlesMore);
-          wxMessage.setArticles(list);
-        } else {
-          wxMessage.setArticles(Collections.singletonList(articles));
-        }
-        return wxMessage;
+    String content = request.getContent().replace("【抖音商城】", "");
+    int startIndex = content.indexOf("】");
+    if (startIndex == -1) {
+      startIndex = content.indexOf("https:");
+      if (startIndex == -1) {
+        startIndex = 0;
       }
+    } else {
+      startIndex++;
     }
-    return "success";
+    int endIndex = content.indexOf("长按复制此条消息");
+    if (endIndex == -1) {
+      endIndex = content.length();
+    }
+
+    String keyword = content.substring(startIndex, endIndex).replace("\n", "");
+    ProductQueryParam param = new ProductQueryParam();
+    param.setKeyword(keyword);
+    param.setUid(RequestHolder.getUid());
+    CommonPage<HJKJDProduct> page = searchProduct(param);
+
+    WxMessage wxMessage = new WxMessage();
+    wxMessage.setFromUserName(request.getToUserName());
+    wxMessage.setToUserName(request.getFromUserName());
+    wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+    if (ObjectUtil.isEmpty(page.getList())) {
+      wxMessage.setMsgType("text");
+      wxMessage.setContent("很遗憾，没有找到该商品的优惠券");
+    }
+    if (page.getList().stream().anyMatch(item -> keyword.contains(item.getGoods_name()))) {
+      HJKJDProduct product = page.getList().get(0);
+      wxMessage.setMsgType("news");
+      wxMessage.setArticleCount(1);
+      WxMessage.Articles articles = new WxMessage.Articles();
+      articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
+      articles.setDescription(product.getGoods_name());
+      articles.setPicUrl(product.getPicurl());
+      if (page.getList().size() > 1) {
+        articles.setUrl(
+            "https://coupon-h5.pages.dev/#/search/list?type=4&uid="
+                + uid
+                + "&keyword="
+                + product.getGoods_name());
+      } else {
+        articles.setUrl(
+            "https://coupon-h5.pages.dev/#/product/detail?type=4&uid="
+                + uid
+                + "&id="
+                + product.getGoods_id());
+      }
+      wxMessage.setArticles(Collections.singletonList(articles));
+      return wxMessage;
+    } else {
+      HJKJDProduct product = page.getList().get(0);
+      wxMessage.setMsgType("news");
+      wxMessage.setArticleCount(1);
+      WxMessage.Articles articles = new WxMessage.Articles();
+      articles.setTitle("没有找到该商品");
+      articles.setDescription("查看类似商品");
+      articles.setPicUrl(product.getPicurl());
+      articles.setUrl(
+          "https://coupon-h5.pages.dev/#/search/list?type=4&uid="
+              + uid
+              + "&keyword="
+              + product.getGoods_name());
+      wxMessage.setArticles(Collections.singletonList(articles));
+      return wxMessage;
+    }
   }
 
   @Override
   public CommonPage<HJKJDProduct> rankProduct(ProductQueryParam param) {
-    String api = jtkProperties.getApiActUrl() + "/union/jingxuan";
+    String api =
+        "https://openapi.dataoke.com/api/tiktok/tiktok-sx-goods-rank"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&sort_key={sort_key}&sort={sort}";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
           {
-            put("pub_id", jtkProperties.getPubId());
-            put("source", "douyin");
-            put("page", param.getPage());
-            put("pageSize", param.getPageSize());
-            put("type", 1);
+            put("sort_key", "comprehensive_score");
+            put("sort", 1);
           }
         };
-    JTKProductListResponse response =
+    DTKDYProductListResponse response =
         RestTemplateUtil.getInstance()
-            .postForObject(api, searchParams, JTKProductListResponse.class);
+            .getForObject(api, DTKDYProductListResponse.class, DTKUtil.sign(searchParams));
     XLogger.log(
         logger,
         env,
@@ -261,32 +293,41 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     if (response == null) {
       Asserts.fail("服务器异常");
     }
-    if (ObjectUtil.isNotEmpty(response.getData())) {
+    if (ObjectUtil.isNotNull(response.getData())
+        && ObjectUtil.isNotEmpty(response.getData().getList())) {
       return CommonPage.page(
           param.getPage(),
           param.getPageSize(),
-          0L,
-          response.getData().stream().map(this::toProduct).collect(Collectors.toList()));
+          response.getData().getTotal(),
+          response.getData().getList().stream().map(this::toProduct).collect(Collectors.toList()));
     }
     return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
   }
 
   @Override
   public CommonPage<HJKJDProduct> listProduct(ProductQueryParam param) {
-    String api = jtkProperties.getApiActUrl() + "/union/query_goods";
+    String api =
+        "https://openapi.dataoke.com/api/tiktok/tiktok-sx-goods-list"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&page={page}&size={size}&first_cate_ids={first_cate_ids}&sort={sort}";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
           {
-            put("pub_id", jtkProperties.getPubId());
-            put("source", "douyin");
             put("page", param.getPage());
-            put("pageSize", param.getPageSize());
-            put("cat", param.getOptId());
+            put("size", param.getPageSize());
+            put("first_cate_ids", param.getOptId());
           }
         };
-    JTKProductListResponse response =
+    if (param.getSortType() == 6) {
+      searchParams.put("sort", 6);
+    } else if (param.getSortType() == 9) {
+      searchParams.put("sort", 11);
+    } else {
+      searchParams.put("sort", 0);
+    }
+    DTKDYProductListResponse response =
         RestTemplateUtil.getInstance()
-            .postForObject(api, searchParams, JTKProductListResponse.class);
+            .getForObject(api, DTKDYProductListResponse.class, DTKUtil.sign(searchParams));
     XLogger.log(
         logger,
         env,
@@ -297,40 +338,44 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     if (response == null) {
       Asserts.fail("服务器异常");
     }
-    if (ObjectUtil.isNotEmpty(response.getData())) {
+    if (ObjectUtil.isNotNull(response.getData())
+        && ObjectUtil.isNotEmpty(response.getData().getList())) {
       return CommonPage.page(
           param.getPage(),
           param.getPageSize(),
-          0L,
-          response.getData().stream().map(this::toProduct).collect(Collectors.toList()));
+          response.getData().getTotal(),
+          response.getData().getList().stream().map(this::toProduct).collect(Collectors.toList()));
     }
     return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
   }
 
   @Override
   public CommonPage<HJKJDProduct> searchProduct(ProductQueryParam param) {
-    String api = jtkProperties.getApiActUrl() + "/union/search";
+    String api =
+        "https://openapiv2.dataoke.com/tiktok/tiktok-materials-products-search"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&sortType={sortType}&sort={sort}&title={title}&page={page}&pageSize={pageSize}";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
           {
-            put("pub_id", jtkProperties.getPubId());
-            put("source", "douyin");
             put("page", param.getPage());
             put("pageSize", param.getPageSize());
-            put("keyword", param.getKeyword());
-            put("sid", param.getUid());
+            put("title", param.getKeyword());
           }
         };
     if (param.getSortType() == 6) {
-      searchParams.put("sort", 3);
+      searchParams.put("sort", 1);
+      searchParams.put("sortType", 1);
     } else if (param.getSortType() == 9) {
       searchParams.put("sort", 2);
+      searchParams.put("sortType", 0);
     } else {
-      searchParams.put("sort", 1);
+      searchParams.put("sort", 0);
+      searchParams.put("sortType", 1);
     }
-    JTKProductListResponse response =
+    DTKDYProductListResponse response =
         RestTemplateUtil.getInstance()
-            .postForObject(api, searchParams, JTKProductListResponse.class);
+            .getForObject(api, DTKDYProductListResponse.class, DTKUtil.sign(searchParams));
     XLogger.log(
         logger,
         env,
@@ -341,12 +386,13 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     if (response == null) {
       Asserts.fail("服务器异常");
     }
-    if (ObjectUtil.isNotEmpty(response.getData())) {
+    if (ObjectUtil.isNotNull(response.getData())
+        && ObjectUtil.isNotEmpty(response.getData().getList())) {
       return CommonPage.page(
           param.getPage(),
           param.getPageSize(),
-          0L,
-          response.getData().stream().map(this::toProduct).collect(Collectors.toList()));
+          response.getData().getTotal(),
+          response.getData().getList().stream().map(this::toProduct).collect(Collectors.toList()));
     }
     return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
   }
@@ -354,58 +400,105 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   @Override
   public HJKJDProduct getProductDetail(String id, String uid) {
     // 获取详情
-    String api = jtkProperties.getApiActUrl() + "/union/convert";
+    String api =
+        "https://openapiv2.dataoke.com/tiktok/tiktok-materials-products-details"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&productIds={productIds}";
     Map<String, Object> searchParams =
         new HashMap<String, Object>() {
           {
-            put("pub_id", jtkProperties.getPubId());
-            put("source", "douyin");
-            put("goodsId", id);
-            put("sid", uid);
+            put("productIds", id);
           }
         };
-    JTKProductDetailResponse response =
+    DTKDYProductListResponse response =
         RestTemplateUtil.getInstance()
-            .postForObject(api, searchParams, JTKProductDetailResponse.class);
+            .getForObject(api, DTKDYProductListResponse.class, DTKUtil.sign(searchParams));
 
     XLogger.log(
         logger,
         env,
         "[{}],Request:{},Response:{}",
-        "抖音搜索商品",
+        "抖音商品详情",
         JsonUtil.toJson(searchParams),
         JsonUtil.toJson(response));
-    if (response != null && ObjectUtil.isNotNull(response.getData())) {
-      return toProduct(response.getData());
+    if (response != null
+        && ObjectUtil.isNotNull(response.getData())
+        && ObjectUtil.isNotEmpty(response.getData().getList())) {
+      return toProduct(response.getData().getList().get(0));
     }
     return null;
   }
 
   @Override
   public Object getUnionUrl(String id, String uid) {
-    // 获取推广链接
-    return getProductDetail(id, uid);
+    String api =
+        "https://openapiv2.dataoke.com/open-api/tiktok-kol-product-share"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&productUrl={productUrl}&externalInfo={externalInfo}";
+    Map<String, Object> searchParams =
+        new HashMap<String, Object>() {
+          {
+            put("productUrl", id);
+            put("externalInfo", uid);
+          }
+        };
+    DTKDYProductLinkResponse response =
+        RestTemplateUtil.getInstance()
+            .getForObject(api, DTKDYProductLinkResponse.class, DTKUtil.sign(searchParams));
+
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "抖音商品转链",
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
+    if (response != null && ObjectUtil.isNotEmpty(response.getData())) {
+      return response.getData();
+    }
+    return null;
   }
 
-  private HJKJDProduct toProduct(JTKProduct item) {
+  private HJKJDProduct toProduct(DTKDYProduct item) {
     HJKJDProduct product = new HJKJDProduct();
-    product.setGoods_id(item.getGoodsId());
-    product.setGoods_name(item.getGoodsName());
+    product.setGoods_id(item.getProductId());
+    product.setGoods_name(item.getTitle());
+    product.setGoods_url(item.getDetailUrl());
 
-    product.setPrice(item.getMarketPrice());
-    product.setPrice_after(item.getPrice());
-    product.setDiscount(item.getDiscount().toString());
-    product.setRebate(getRebate(new BigDecimal(item.getCommission())));
+    product.setPrice(item.getPrice());
+    if (ObjectUtil.isNull(item.getCouponPrice()) || ObjectUtil.equals(item.getCouponPrice(), "0")) {
+      product.setPrice_after(item.getPrice());
+      product.setDiscount("0");
+    } else {
+      product.setPrice_after(item.getCouponPrice());
+      product.setDiscount(
+          new BigDecimal(item.getPrice())
+              .subtract(new BigDecimal(item.getCouponPrice()))
+              .stripTrailingZeros()
+              .toPlainString());
+    }
+    product.setRebate(
+        getRebate(
+            new BigDecimal(
+                Optional.ofNullable(
+                        Optional.ofNullable(item.getCosFee()).orElse(item.getKolCosFee()))
+                    .map(Object::toString)
+                    .orElse("0"))));
     if (StrUtil.equals(env, "dev")) {
-      product.setCommissionshare(item.getCommissionRate());
-      product.setCommission(item.getCommission());
+      product.setCommissionshare(
+          Optional.ofNullable(Optional.ofNullable(item.getCosRatio()).orElse(item.getKolCosRatio()))
+              .map(Object::toString)
+              .orElse("0"));
+      product.setCommission(
+          Optional.ofNullable(Optional.ofNullable(item.getCosFee()).orElse(item.getKolCosFee()))
+              .map(Object::toString)
+              .orElse("0"));
     }
-    product.setPicurl(item.getGoodsThumbUrl());
-    if (ObjectUtil.isNotEmpty(item.getGoodsCarouselPictures())) {
-      product.setPicurls(String.join(",", item.getGoodsCarouselPictures()));
-      product.setPicurl(item.getGoodsCarouselPictures().get(0));
+    product.setPicurl(item.getCover());
+    if (ObjectUtil.isNotEmpty(item.getImgs())) {
+      product.setPicurls(String.join(",", item.getImgs()));
     }
-    product.setSales(item.getSalesTip().longValue());
+    product.setSales(item.getSales().longValue());
     if (product.getSales() >= 10000) {
       product.setSalesTip(
           String.format(
@@ -417,7 +510,7 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     } else {
       product.setSalesTip(String.format("已售%s件", product.getSales()));
     }
-    product.setTkl(item.getTkl());
+    product.setShopname(item.getShopName());
     product.setSource(ProductSource.DY.getCode());
     return product;
   }

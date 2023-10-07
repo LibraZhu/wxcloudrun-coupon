@@ -98,91 +98,101 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         "SyncWPHOrder",
         JsonUtil.toJson(searchParams),
         JsonUtil.toJson(response));
-    if (response != null
-        && response.getData() != null
-        && response.getData().getOrderInfoList() != null
-        && response.getData().getOrderInfoList() instanceof List) {
+    if (response != null && response.getData() != null && response.getData() instanceof Map) {
+      HJKWPHOrderResponse.OrderPage orderPage =
+          JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKWPHOrderResponse.OrderPage.class);
+      if (orderPage != null
+          && orderPage.getOrderInfoList() != null
+          && orderPage.getOrderInfoList() instanceof List) {
 
-      List<HJKWPHOrder> orderList =
-          JsonUtil.toList(
-              JsonUtil.toJson(response.getData().getOrderInfoList()),
-              new TypeReference<List<HJKWPHOrder>>() {});
-      if (ObjectUtil.isEmpty(orderList)) {
-        return;
-      }
-      List<OmsOrder> list =
-          orderList.stream()
-              .map(
-                  (item) -> {
-                    OmsOrder order = new OmsOrder();
-                    order.setOrderSource(ProductSource.WPH.getCode());
-                    order.setOrderId(item.getOrderSn());
-                    order.setOrderSn(item.getOrderSn());
-                    order.setOrderEmt(2);
-                    if (ObjectUtil.isNotEmpty(item.getOrderTime())) {
-                      order.setOrderTime(
-                          LocalDateTime.ofInstant(
-                              Instant.ofEpochMilli(item.getOrderTime()), ZoneId.systemDefault()));
-                    }
-                    if (ObjectUtil.isNotEmpty(item.getSignTime())) {
-                      order.setFinishTime(
-                          LocalDateTime.ofInstant(
-                              Instant.ofEpochMilli(item.getSignTime()), ZoneId.systemDefault()));
-                    }
-                    if (ObjectUtil.isNotEmpty(item.getLastUpdateTime())) {
-                      order.setModifyTime(
-                          LocalDateTime.ofInstant(
-                              Instant.ofEpochMilli(item.getLastUpdateTime()),
-                              ZoneId.systemDefault()));
-                    }
-                    if (ObjectUtil.isNotEmpty(item.getSettledTime())) {
-                      order.setSettleTime(
-                          LocalDateTime.ofInstant(
-                              Instant.ofEpochMilli(item.getSettledTime()), ZoneId.systemDefault()));
-                    }
-                    order.setPid(item.getPid());
-                    HJKWPHOrder.DetailListDTO detail = item.getDetailList().get(0);
-                    order.setSkuId(detail.getGoodsId());
-                    order.setSkuName(detail.getGoodsName());
-                    order.setSkuNum(Long.valueOf(detail.getGoodsCount()));
-                    order.setImageUrl(detail.getGoodsThumb());
-                    order.setPrice(detail.getCommissionTotalCost());
-                    order.setCommissionRate(detail.getCommissionRate());
-                    order.setActualCosPrice(detail.getCommissionTotalCost());
-                    order.setActualFee(detail.getCommission());
-                    if (ObjectUtil.equals(item.getOrderSubStatusName(), "已付款")) {
-                      order.setStatus(OrderStatus.DELIVER.getCode());
-                    } else if (ObjectUtil.equals(item.getOrderSubStatusName(), "已签收")) {
-                      order.setStatus(OrderStatus.COMPLETE.getCode());
-                    } else if (ObjectUtil.equals(item.getOrderSubStatusName(), "已失效")) {
-                      order.setStatus(OrderStatus.INVALID.getCode());
-                      order.setStatusDes(item.getOrderSubStatusName());
-                    }
-                    order.setUid(item.getStatParam());
-                    order.setRate(wphProperties.getRate());
-                    // 金额小于0.02不算返利
-                    order.setRebate(
-                        new BigDecimal(detail.getCommission()).compareTo(new BigDecimal("0.02"))
-                                >= 1
-                            ? new BigDecimal(order.getActualFee())
-                                .multiply(new BigDecimal(order.getRate()))
-                                .setScale(2, RoundingMode.DOWN)
-                                .toString()
-                            : "0.00");
-                    return order;
-                  })
-              .collect(Collectors.toList());
-      XLogger.log(
-          logger, env, "同步唯品会订单:[{}~{}],第{}页,{}", startTime, endTime, page, JsonUtil.toJson(list));
-      if (list.size() > 0) {
-        baseMapper.saveOrUpdateList(list);
-        // 是否还有更多
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        List<HJKWPHOrder> orderList =
+            JsonUtil.toList(
+                JsonUtil.toJson(orderPage.getOrderInfoList()),
+                new TypeReference<List<HJKWPHOrder>>() {});
+        if (orderList == null || ObjectUtil.isEmpty(orderList)) {
+          return;
         }
-        syncOrderPage(page + 1, startTime, endTime);
+        List<OmsOrder> list =
+            orderList.stream()
+                .map(
+                    (item) -> {
+                      OmsOrder order = new OmsOrder();
+                      order.setOrderSource(ProductSource.WPH.getCode());
+                      order.setOrderId(item.getOrderSn());
+                      order.setOrderSn(item.getOrderSn());
+                      order.setOrderEmt(2);
+                      if (ObjectUtil.isNotEmpty(item.getOrderTime())) {
+                        order.setOrderTime(
+                            LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(item.getOrderTime()), ZoneId.systemDefault()));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getSignTime())) {
+                        order.setFinishTime(
+                            LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(item.getSignTime()), ZoneId.systemDefault()));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getLastUpdateTime())) {
+                        order.setModifyTime(
+                            LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(item.getLastUpdateTime()),
+                                ZoneId.systemDefault()));
+                      }
+                      if (ObjectUtil.isNotEmpty(item.getSettledTime())) {
+                        order.setSettleTime(
+                            LocalDateTime.ofInstant(
+                                Instant.ofEpochMilli(item.getSettledTime()),
+                                ZoneId.systemDefault()));
+                      }
+                      order.setPid(item.getPid());
+                      HJKWPHOrder.DetailListDTO detail = item.getDetailList().get(0);
+                      order.setSkuId(detail.getGoodsId());
+                      order.setSkuName(detail.getGoodsName());
+                      order.setSkuNum(Long.valueOf(detail.getGoodsCount()));
+                      order.setImageUrl(detail.getGoodsThumb());
+                      order.setPrice(detail.getCommissionTotalCost());
+                      order.setCommissionRate(detail.getCommissionRate());
+                      order.setActualCosPrice(detail.getCommissionTotalCost());
+                      order.setActualFee(detail.getCommission());
+                      if (ObjectUtil.equals(item.getOrderSubStatusName(), "已付款")) {
+                        order.setStatus(OrderStatus.DELIVER.getCode());
+                      } else if (ObjectUtil.equals(item.getOrderSubStatusName(), "已签收")) {
+                        order.setStatus(OrderStatus.COMPLETE.getCode());
+                      } else if (ObjectUtil.equals(item.getOrderSubStatusName(), "已失效")) {
+                        order.setStatus(OrderStatus.INVALID.getCode());
+                        order.setStatusDes(item.getOrderSubStatusName());
+                      }
+                      order.setUid(item.getStatParam());
+                      order.setRate(wphProperties.getRate());
+                      // 金额小于0.02不算返利
+                      order.setRebate(
+                          new BigDecimal(detail.getCommission()).compareTo(new BigDecimal("0.02"))
+                                  >= 1
+                              ? new BigDecimal(detail.getCommission())
+                                  .multiply(new BigDecimal(order.getRate()))
+                                  .setScale(2, RoundingMode.DOWN)
+                                  .toString()
+                              : "0.00");
+                      return order;
+                    })
+                .collect(Collectors.toList());
+        XLogger.log(
+            logger,
+            env,
+            "同步唯品会订单:[{}~{}],第{}页,{}",
+            startTime,
+            endTime,
+            page,
+            JsonUtil.toJson(list));
+        if (list.size() > 0) {
+          baseMapper.saveOrUpdateList(list);
+          // 是否还有更多
+          try {
+            Thread.sleep(1000);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
+          syncOrderPage(page + 1, startTime, endTime);
+        }
       }
     }
   }

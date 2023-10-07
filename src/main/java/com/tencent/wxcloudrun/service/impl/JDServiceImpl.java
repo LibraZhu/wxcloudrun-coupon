@@ -181,7 +181,10 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       order.setSkuName(item.getSkuName());
                       order.setSkuNum(Long.valueOf(item.getSkuNum()));
                       order.setImageUrl(item.getGoodsInfo().getImageUrl());
-                      order.setPrice(item.getPrice().toString());
+                      order.setPrice(
+                          new BigDecimal(item.getPrice().toString())
+                              .multiply(new BigDecimal(item.getSkuNum()))
+                              .toString());
                       order.setCommissionRate(item.getCommissionRate().toString());
                       order.setFinalRate(item.getFinalRate().toString());
                       order.setEstimateCosPrice(item.getEstimateCosPrice().toString());
@@ -200,10 +203,15 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       }
                       order.setUid(item.getSubUnionId());
                       order.setRate(jdProperties.getRate());
+                      // 先显示预估佣金
+                      BigDecimal commission = new BigDecimal(item.getEstimateFee().toString());
+                      if (ObjectUtil.equals(item.getActualFee(), 0.0)) {
+                        commission = new BigDecimal(item.getActualFee().toString());
+                      }
                       // 金额小于0.02不算返利
                       order.setRebate(
-                          item.getActualFee() >= 0.02
-                              ? new BigDecimal(order.getActualFee())
+                          commission.compareTo(new BigDecimal("0.02")) >= 1
+                              ? commission
                                   .multiply(new BigDecimal(order.getRate()))
                                   .setScale(2, RoundingMode.DOWN)
                                   .toString()

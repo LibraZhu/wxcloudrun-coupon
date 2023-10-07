@@ -9,6 +9,7 @@ public class HJKJDProduct {
   private String goods_name; // 商品名称
   private String goods_short_name; // 短标题
   private String goods_desc; // 导购信息
+  private String goods_url; // 商品链接
   private String price; // 原价
   private String price_after; // 券后价
   private String discount; // 券金额

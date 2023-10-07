@@ -6,7 +6,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class HJKWPHOrderResponse extends HJKResponse {
-  private OrderPage data;
+  private Object data;
 
   @Data
   public static class OrderPage {

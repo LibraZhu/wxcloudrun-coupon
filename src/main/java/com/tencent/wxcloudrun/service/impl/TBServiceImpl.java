@@ -123,7 +123,8 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         HJKTBOrderResponse.OrderPage orderPage =
             JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBOrderResponse.OrderPage.class);
 
-        if (ObjectUtil.isNotNull(orderPage.getResults())
+        if (orderPage != null
+            && ObjectUtil.isNotNull(orderPage.getResults())
             && ObjectUtil.isNotEmpty(orderPage.getResults().getPublisher_order_dto())) {
           List<String> sidList = new ArrayList<>();
           List<OmsOrder> list =
@@ -166,7 +167,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                         order.setSkuName(item.getItemTitle());
                         order.setSkuNum(Long.valueOf(item.getItemNum()));
                         order.setImageUrl(item.getItemImg());
-                        order.setPrice(item.getItemPrice());
+                        order.setPrice(item.getPayPrice());
                         order.setCommissionRate(item.getTotalCommissionRate());
                         order.setActualCosPrice(item.getPayPrice());
                         order.setActualFee(item.getTotalCommissionFee());
@@ -193,7 +194,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                             new BigDecimal(item.getTotalCommissionFee())
                                         .compareTo(new BigDecimal("0.02"))
                                     >= 1
-                                ? new BigDecimal(order.getActualFee())
+                                ? new BigDecimal(item.getTotalCommissionFee())
                                     .multiply(new BigDecimal(order.getRate()))
                                     .setScale(2, RoundingMode.DOWN)
                                     .toString()
@@ -273,42 +274,53 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         ProductQueryParam param = new ProductQueryParam();
         param.setKeyword(keyword);
         CommonPage<HJKJDProduct> page = searchProduct(param);
-        if (ObjectUtil.isNotEmpty(page.getList())) {
+
+        WxMessage wxMessage = new WxMessage();
+        wxMessage.setFromUserName(request.getToUserName());
+        wxMessage.setToUserName(request.getFromUserName());
+        wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+        if (ObjectUtil.isEmpty(page.getList())) {
+          wxMessage.setMsgType("text");
+          wxMessage.setContent("很遗憾，没有找到该商品的优惠券");
+        }
+        if (page.getList().stream()
+            .anyMatch(item -> request.getContent().contains(item.getGoods_name()))) {
           HJKJDProduct product = page.getList().get(0);
-          WxMessage wxMessage = new WxMessage();
-          wxMessage.setFromUserName(request.getToUserName());
-          wxMessage.setToUserName(request.getFromUserName());
-          wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
           wxMessage.setMsgType("news");
           wxMessage.setArticleCount(1);
           WxMessage.Articles articles = new WxMessage.Articles();
           articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
           articles.setDescription(product.getGoods_name());
           articles.setPicUrl(product.getPicurl());
-          HJKTBLinkResponse.TbLink item =
-              (HJKTBLinkResponse.TbLink) getUnionUrl(product.getGoods_id(), uid.toString());
-          articles.setUrl(
-              Optional.ofNullable(item)
-                  .map(HJKTBLinkResponse.TbLink::getCouponClickUrl)
-                  .orElse(""));
           if (page.getList().size() > 1) {
-            wxMessage.setArticleCount(2);
-            WxMessage.Articles articlesMore = new WxMessage.Articles();
-            articlesMore.setTitle("更多相似商品");
-            articlesMore.setDescription("更多相似商品");
-            articlesMore.setPicUrl(product.getPicurl());
-            articlesMore.setUrl(
-                "https://springboot-q6l6-14929-5-1314654459.sh.run.tcloudbase.com/#/search/list?type=3&uid="
+            articles.setUrl(
+                "https://coupon-h5.pages.dev/#/search/list?type=3&uid="
                     + uid
                     + "&keyword="
                     + product.getGoods_name());
-            ArrayList<WxMessage.Articles> list = new ArrayList<>();
-            list.add(articles);
-            list.add(articlesMore);
-            wxMessage.setArticles(list);
           } else {
-            wxMessage.setArticles(Collections.singletonList(articles));
+            articles.setUrl(
+                "https://coupon-h5.pages.dev/#/product/detail?type=3&uid="
+                    + uid
+                    + "&id="
+                    + product.getGoods_id());
           }
+          wxMessage.setArticles(Collections.singletonList(articles));
+          return wxMessage;
+        } else {
+          HJKJDProduct product = page.getList().get(0);
+          wxMessage.setMsgType("news");
+          wxMessage.setArticleCount(1);
+          WxMessage.Articles articles = new WxMessage.Articles();
+          articles.setTitle("没有找到该商品");
+          articles.setDescription("查看类似商品");
+          articles.setPicUrl(product.getPicurl());
+          articles.setUrl(
+              "https://coupon-h5.pages.dev/#/search/list?type=4&uid="
+                  + uid
+                  + "&keyword="
+                  + product.getGoods_name());
+          wxMessage.setArticles(Collections.singletonList(articles));
           return wxMessage;
         }
       }
@@ -328,10 +340,11 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         articles.setTitle("券后价:" + product.getPrice_after() + " 约返:" + product.getRebate());
         articles.setDescription(product.getGoods_name());
         articles.setPicUrl(product.getPicurl());
-        HJKTBLinkResponse.TbLink item =
-            (HJKTBLinkResponse.TbLink) getUnionUrl(product.getGoods_id(), uid.toString());
         articles.setUrl(
-            Optional.ofNullable(item).map(HJKTBLinkResponse.TbLink::getCouponClickUrl).orElse(""));
+            "https://coupon-h5.pages.dev/#/product/detail?type=3&uid="
+                + uid
+                + "&id="
+                + product.getGoods_id());
         wxMessage.setArticles(Collections.singletonList(articles));
         return wxMessage;
       }

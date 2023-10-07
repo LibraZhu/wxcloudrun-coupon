@@ -64,26 +64,34 @@ public class ProductServiceImpl implements ProductService {
       String content = URLDecoder.decode(param.getKeyword(), StandardCharsets.UTF_8);
       String id = content.substring(content.indexOf("id=") + 3).split("&")[0];
       HJKJDProduct product = tbService.getProductDetail(id);
-      if(product==null) {
+      if (product == null) {
         Asserts.fail(ResultCode.NO_PRODUCT);
       }
       return Collections.singletonList(product);
     } else if (param.getKeyword().contains("v.douyin.com")) {
-      Matcher matcher =
-          Pattern.compile(Pattern.quote("【") + "(.*?)" + Pattern.quote("】"))
-              .matcher(param.getKeyword());
-      if (matcher.find()) {
-        String keyword = matcher.group(1).trim();
-        param.setKeyword(keyword);
-        param.setUid(RequestHolder.getUid());
-        CommonPage<HJKJDProduct> page = dyService.searchProduct(param);
-        if (ObjectUtil.isEmpty(page.getList())) {
-          Asserts.fail(ResultCode.NO_PRODUCT);
+      String content = param.getKeyword().replace("【抖音商城】", "");
+      int startIndex = content.indexOf("】");
+      if (startIndex == -1) {
+        startIndex = content.indexOf("https:");
+        if (startIndex == -1) {
+          startIndex = 0;
         }
-        return page.getList();
       } else {
+        startIndex++;
+      }
+      int endIndex = content.indexOf("长按复制此条消息");
+      if (endIndex == -1) {
+        endIndex = content.length();
+      }
+
+      String keyword = content.substring(startIndex, endIndex).replace("\n", "");
+      param.setKeyword(keyword);
+      param.setUid(RequestHolder.getUid());
+      CommonPage<HJKJDProduct> page = dyService.searchProduct(param);
+      if (ObjectUtil.isEmpty(page.getList())) {
         Asserts.fail(ResultCode.NO_PRODUCT);
       }
+      return page.getList();
     } else if (param.getKeyword().contains("t.vip.com")) {
       String content = URLDecoder.decode(param.getKeyword(), StandardCharsets.UTF_8);
       String goodsId = content.substring(content.indexOf("goodsId=") + 8).split("&")[0];

@@ -162,7 +162,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       order.setSkuNum(item.getGoodsQuantity());
                       order.setImageUrl(item.getGoodsThumbnailUrl());
                       order.setPrice(
-                          new BigDecimal(item.getGoodsPrice().toString())
+                          new BigDecimal(item.getOrderAmount().toString())
                               .divide(new BigDecimal(100), 2, RoundingMode.DOWN)
                               .toString());
                       order.setCommissionRate(
