@@ -197,24 +197,8 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   @Override
   public Object wxMessage(WxMessageRequest request, Long uid) {
-    String content = request.getContent().replace("【抖音商城】", "");
-    int startIndex = content.indexOf("】");
-    if (startIndex == -1) {
-      startIndex = content.indexOf("https:");
-      if (startIndex == -1) {
-        startIndex = 0;
-      }
-    } else {
-      startIndex++;
-    }
-    int endIndex = content.indexOf("长按复制此条消息");
-    if (endIndex == -1) {
-      endIndex = content.length();
-    }
-
-    String keyword = content.substring(startIndex, endIndex).replace("\n", "");
     ProductQueryParam param = new ProductQueryParam();
-    param.setKeyword(keyword);
+    param.setKeyword(request.getContent());
     param.setUid(RequestHolder.getUid());
     CommonPage<HJKJDProduct> page = searchProduct(param);
 
@@ -226,8 +210,10 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       wxMessage.setMsgType("text");
       wxMessage.setContent("很遗憾，没有找到该商品的优惠");
     }
-    if (page.getList().stream().anyMatch(item -> keyword.contains(item.getGoods_name()))) {
-      HJKJDProduct product = page.getList().get(0);
+    Optional<HJKJDProduct> p =
+            page.getList().stream().filter(item -> request.getContent().contains(item.getGoods_name())).findFirst();
+    if (p.isPresent()) {
+      HJKJDProduct product = p.get();
       wxMessage.setMsgType("news");
       wxMessage.setArticleCount(1);
       WxMessage.Articles articles = new WxMessage.Articles();

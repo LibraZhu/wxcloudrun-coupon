@@ -16,8 +16,10 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -69,27 +71,20 @@ public class ProductServiceImpl implements ProductService {
       }
       return Collections.singletonList(product);
     } else if (param.getKeyword().contains("v.douyin.com")) {
-      String content = param.getKeyword().replace("【抖音商城】", "");
-      int startIndex = content.indexOf("】");
-      if (startIndex == -1) {
-        startIndex = content.indexOf("https:");
-        if (startIndex == -1) {
-          startIndex = 0;
-        }
-      } else {
-        startIndex++;
-      }
-      int endIndex = content.indexOf("长按复制此条消息");
-      if (endIndex == -1) {
-        endIndex = content.length();
-      }
-
-      String keyword = content.substring(startIndex, endIndex).replace("\n", "");
-      param.setKeyword(keyword);
+      param.setKeyword(param.getKeyword());
       param.setUid(RequestHolder.getUid());
       CommonPage<HJKJDProduct> page = dyService.searchProduct(param);
       if (ObjectUtil.isEmpty(page.getList())) {
         Asserts.fail(ResultCode.NO_PRODUCT);
+      }
+      Optional<HJKJDProduct> p =
+          page.getList().stream()
+              .filter(item -> param.getKeyword().contains(item.getGoods_name()))
+              .findFirst();
+      if (p.isPresent()) {
+        List<HJKJDProduct> list = new ArrayList<>();
+        list.add(p.get());
+        return list;
       }
       return page.getList();
     } else if (param.getKeyword().contains("t.vip.com")) {
