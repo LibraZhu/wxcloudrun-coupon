@@ -6,7 +6,8 @@ public enum ProductSource {
   JD(2, "京东"),
   TB(3, "淘宝"),
   DY(4, "抖音"),
-  WPH(5, "唯品会");
+  WPH(5, "唯品会"),
+  ONE(6, "一分购");
   private final int code;
   private final String message;
 

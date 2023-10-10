@@ -26,8 +26,6 @@ import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -160,21 +158,27 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                     } else {
                       order.setUid(item.getExternalInfo());
                     }
-                    order.setRate(dyProperties.getRate());
-                    // 先显示预估佣金
-                    BigDecimal commission =
-                        new BigDecimal(item.getEstimatedTotalCommission().toString());
-                    if (ObjectUtil.equals(item.getFlowPoint(), "SETTLE")) {
-                      commission = new BigDecimal(item.getRealCommission().toString());
+                    // 一分购的订单不计算返利
+                    if (order.getUid().startsWith("F")) {
+                      order.setOrderSource(ProductSource.ONE.getCode());
+                      order.setUid(order.getUid().substring(1));
+                    } else {
+                      order.setRate(dyProperties.getRate());
+                      // 先显示预估佣金
+                      BigDecimal commission =
+                          new BigDecimal(item.getEstimatedTotalCommission().toString());
+                      if (ObjectUtil.equals(item.getFlowPoint(), "SETTLE")) {
+                        commission = new BigDecimal(item.getRealCommission().toString());
+                      }
+                      // 金额小于0.02不算返利
+                      order.setRebate(
+                          commission.compareTo(new BigDecimal("0.02")) >= 1
+                              ? commission
+                                  .multiply(new BigDecimal(order.getRate()))
+                                  .setScale(2, RoundingMode.DOWN)
+                                  .toString()
+                              : "0.00");
                     }
-                    // 金额小于0.02不算返利
-                    order.setRebate(
-                        commission.compareTo(new BigDecimal("0.02")) >= 1
-                            ? commission
-                                .multiply(new BigDecimal(order.getRate()))
-                                .setScale(2, RoundingMode.DOWN)
-                                .toString()
-                            : "0.00");
                     return order;
                   })
               .collect(Collectors.toList());
@@ -211,7 +215,9 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       wxMessage.setContent("很遗憾，没有找到该商品的优惠");
     }
     Optional<HJKJDProduct> p =
-            page.getList().stream().filter(item -> request.getContent().contains(item.getGoods_name())).findFirst();
+        page.getList().stream()
+            .filter(item -> request.getContent().contains(item.getGoods_name()))
+            .findFirst();
     if (p.isPresent()) {
       HJKJDProduct product = p.get();
       wxMessage.setMsgType("news");
@@ -251,6 +257,116 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       wxMessage.setArticles(Collections.singletonList(articles));
       return wxMessage;
     }
+  }
+
+  @Override
+  public CommonPage<HJKJDProduct> oneFenProduct(ProductQueryParam param) {
+    String api =
+        "https://openapi.dataoke.com/api/tiktok/tiktok-one-fen-goods-list"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&page={page}&size={size}&search_type={search_type}&sort_type={sort_type}";
+    Map<String, Object> searchParams =
+        new HashMap<String, Object>() {
+          {
+            put("page", param.getPage());
+            put("size", param.getPageSize());
+          }
+        };
+    if (param.getSortType() == 5) {
+      searchParams.put("search_type", 1);
+      searchParams.put("sort_type", 0);
+    } else if (param.getSortType() == 6) {
+      searchParams.put("search_type", 1);
+      searchParams.put("sort_type", 1);
+    } else if (param.getSortType() == 9) {
+      searchParams.put("search_type", 2);
+      searchParams.put("sort_type", 0);
+    } else if (param.getSortType() == 10) {
+      searchParams.put("search_type", 2);
+      searchParams.put("sort_type", 1);
+    } else {
+      searchParams.put("search_type", 0);
+      searchParams.put("sort_type", 1);
+    }
+    DTKDYProductListResponse response =
+        RestTemplateUtil.getInstance()
+            .getForObject(api, DTKDYProductListResponse.class, DTKUtil.sign(searchParams));
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "抖音一分购商品列表",
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
+    if (response == null) {
+      Asserts.fail("服务器异常");
+    }
+    if (ObjectUtil.isNotNull(response.getData())
+        && ObjectUtil.isNotEmpty(response.getData().getList())) {
+      return CommonPage.page(
+          param.getPage(),
+          param.getPageSize(),
+          response.getData().getTotal(),
+          response.getData().getList().stream()
+              .map(this::toFenProduct)
+              .collect(Collectors.toList()));
+    }
+    return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
+  }
+
+  @Override
+  public CommonPage<HJKJDProduct> oneYuanProduct(ProductQueryParam param) {
+    String api =
+        "https://openapi.dataoke.com/api/tiktok/tiktok-one-yuan-goods-list"
+            + "?appKey={appKey}&nonce={nonce}&timer={timer}&version={version}&signRan={signRan}"
+            + "&page={page}&size={size}&search_type={search_type}&sort_type={sort_type}";
+    Map<String, Object> searchParams =
+        new HashMap<String, Object>() {
+          {
+            put("page", param.getPage());
+            put("size", param.getPageSize());
+          }
+        };
+    if (param.getSortType() == 5) {
+      searchParams.put("search_type", 1);
+      searchParams.put("sort_type", 0);
+    } else if (param.getSortType() == 6) {
+      searchParams.put("search_type", 1);
+      searchParams.put("sort_type", 1);
+    } else if (param.getSortType() == 9) {
+      searchParams.put("search_type", 2);
+      searchParams.put("sort_type", 0);
+    } else if (param.getSortType() == 10) {
+      searchParams.put("search_type", 2);
+      searchParams.put("sort_type", 1);
+    } else {
+      searchParams.put("search_type", 0);
+      searchParams.put("sort_type", 1);
+    }
+    DTKDYProductListResponse response =
+        RestTemplateUtil.getInstance()
+            .getForObject(api, DTKDYProductListResponse.class, DTKUtil.sign(searchParams));
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "抖音一元购商品列表",
+        JsonUtil.toJson(searchParams),
+        JsonUtil.toJson(response));
+    if (response == null) {
+      Asserts.fail("服务器异常");
+    }
+    if (ObjectUtil.isNotNull(response.getData())
+        && ObjectUtil.isNotEmpty(response.getData().getList())) {
+      return CommonPage.page(
+          param.getPage(),
+          param.getPageSize(),
+          response.getData().getTotal(),
+          response.getData().getList().stream()
+              .map(this::toFenProduct)
+              .collect(Collectors.toList()));
+    }
+    return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
   }
 
   @Override
@@ -479,6 +595,50 @@ public class DYServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           Optional.ofNullable(Optional.ofNullable(item.getCosFee()).orElse(item.getKolCosFee()))
               .map(Object::toString)
               .orElse("0"));
+    }
+    product.setPicurl(item.getCover());
+    if (ObjectUtil.isNotEmpty(item.getImgs())) {
+      product.setPicurls(String.join(",", item.getImgs()));
+    }
+    product.setSales(item.getSales().longValue());
+    if (product.getSales() >= 10000) {
+      product.setSalesTip(
+          String.format(
+              "已售%s万+件",
+              new BigDecimal(product.getSales())
+                  .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
+                  .stripTrailingZeros()
+                  .toPlainString()));
+    } else {
+      product.setSalesTip(String.format("已售%s件", product.getSales()));
+    }
+    product.setShopname(item.getShopName());
+    product.setSource(ProductSource.DY.getCode());
+    return product;
+  }
+
+  private HJKJDProduct toFenProduct(DTKDYProduct item) {
+    HJKJDProduct product = new HJKJDProduct();
+    product.setIs_fen(true);
+    product.setGoods_id(item.getProductId());
+    product.setGoods_name(item.getTitle());
+    product.setGoods_url(item.getDetailUrl());
+
+    product.setPrice(item.getPrice());
+    if (ObjectUtil.isNotNull(item.getNewUserPrice())) {
+      product.setPrice_after(item.getNewUserPrice());
+      product.setDiscount("0");
+    } else if (ObjectUtil.isNull(item.getCouponPrice())
+        || ObjectUtil.equals(item.getCouponPrice(), "0")) {
+      product.setPrice_after(item.getPrice());
+      product.setDiscount("0");
+    } else {
+      product.setPrice_after(item.getCouponPrice());
+      product.setDiscount(
+          new BigDecimal(item.getPrice())
+              .subtract(new BigDecimal(item.getCouponPrice()))
+              .stripTrailingZeros()
+              .toPlainString());
     }
     product.setPicurl(item.getCover());
     if (ObjectUtil.isNotEmpty(item.getImgs())) {

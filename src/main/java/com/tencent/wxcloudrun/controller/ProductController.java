@@ -7,8 +7,7 @@ import com.tencent.wxcloudrun.dto.HJKJDProduct;
 import com.tencent.wxcloudrun.dto.ProductDetailParam;
 import com.tencent.wxcloudrun.dto.ProductLinkParam;
 import com.tencent.wxcloudrun.dto.ProductQueryParam;
-import com.tencent.wxcloudrun.service.JDService;
-import com.tencent.wxcloudrun.service.PddService;
+import com.tencent.wxcloudrun.service.DYService;
 import com.tencent.wxcloudrun.service.ProductService;
 import com.tencent.wxcloudrun.service.UmsUserService;
 import io.swagger.annotations.ApiOperation;
@@ -28,18 +27,15 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/product")
 public class ProductController {
-  JDService jdService;
-  PddService pddService;
+  DYService dyService;
   ProductService productService;
   UmsUserService umsUserService;
 
   public ProductController(
-      @Autowired JDService jdService,
-      @Autowired PddService pddService,
+      @Autowired DYService dyService,
       @Autowired ProductService productService,
       @Autowired UmsUserService umsUserService) {
-    this.jdService = jdService;
-    this.pddService = pddService;
+    this.dyService = dyService;
     this.productService = productService;
     this.umsUserService = umsUserService;
   }
@@ -81,10 +77,31 @@ public class ProductController {
     return CommonResult.success(productService.link(param));
   }
 
+  @ApiOperation("一分购商品转链")
+  @PostMapping("/fenLink")
+  @ResponseBody
+  public CommonResult<Object> fenLink(@Validated @RequestBody ProductLinkParam param) {
+    return CommonResult.success(productService.fenLink(param));
+  }
+
   @ApiOperation("实时热销商品列表")
   @PostMapping("/hotList")
   @ResponseBody
   public CommonResult<CommonPage<HJKJDProduct>> hotList(@RequestBody ProductQueryParam param) {
     return CommonResult.success(productService.hotList(param));
+  }
+
+  @ApiOperation("抖音一分购")
+  @PostMapping("/oneFenList")
+  @ResponseBody
+  public CommonResult<CommonPage<HJKJDProduct>> oneFenList(@RequestBody ProductQueryParam param) {
+    return CommonResult.success(dyService.oneFenProduct(param));
+  }
+
+  @ApiOperation("抖音一元购")
+  @PostMapping("/oneYuanList")
+  @ResponseBody
+  public CommonResult<CommonPage<HJKJDProduct>> oneYuanList(@RequestBody ProductQueryParam param) {
+    return CommonResult.success(dyService.oneYuanProduct(param));
   }
 }

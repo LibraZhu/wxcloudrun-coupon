@@ -34,6 +34,22 @@ public interface DYService extends IService<OmsOrder> {
   Object wxMessage(WxMessageRequest request, Long uid);
 
   /**
+   * 一分购
+   *
+   * @param param
+   * @return
+   */
+  CommonPage<HJKJDProduct> oneFenProduct(ProductQueryParam param);
+
+  /**
+   * 一元购
+   *
+   * @param param
+   * @return
+   */
+  CommonPage<HJKJDProduct> oneYuanProduct(ProductQueryParam param);
+
+  /**
    * 榜单商品列表
    *
    * @param param 查询条件

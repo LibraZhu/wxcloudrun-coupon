@@ -21,6 +21,8 @@ public class DTKDYProduct {
     private List<String> imgs;
     @JsonProperty("price")
     private String price;
+    @JsonProperty("newUserPrice")
+    private String newUserPrice;//抖音支付新用户价
     @JsonProperty("couponPrice")
     private String couponPrice;
     @JsonProperty("sales")

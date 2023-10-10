@@ -3,7 +3,6 @@ package com.tencent.wxcloudrun.service.impl;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
-import com.baomidou.mybatisplus.extension.conditions.update.LambdaUpdateChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.dao.PmsWalletMapper;
@@ -11,6 +10,7 @@ import com.tencent.wxcloudrun.dto.WalletMoneyDto;
 import com.tencent.wxcloudrun.dto.WalletParam;
 import com.tencent.wxcloudrun.enums.OrderStatus;
 import com.tencent.wxcloudrun.enums.WalletPayStatus;
+import com.tencent.wxcloudrun.enums.WalletPayType;
 import com.tencent.wxcloudrun.enums.WalletRecordType;
 import com.tencent.wxcloudrun.model.OmsOrder;
 import com.tencent.wxcloudrun.model.PmsWallet;
@@ -89,16 +89,16 @@ public class PmsWalletServiceImpl extends ServiceImpl<PmsWalletMapper, PmsWallet
 
   @Override
   public Object modify(WalletParam request) {
-    LambdaUpdateChainWrapper<PmsWallet> wrapper =
-        lambdaUpdate().eq(PmsWallet::getUid, RequestHolder.getUid());
-    if (ObjectUtil.isNotEmpty(request.getBank())) {
-      wrapper.set(PmsWallet::getBank, request.getBank());
-      wrapper.set(PmsWallet::getBankName, request.getBankName());
-      wrapper.set(PmsWallet::getName, request.getName());
-    }
     if (ObjectUtil.isNotEmpty(request.getWeixin())) {
-      wrapper.set(PmsWallet::getWeixin, request.getWeixin());
+      PmsWallet wallet = lambdaQuery().eq(PmsWallet::getUid, RequestHolder.getUid()).one();
+      // 不支持更新微信号
+      if (wallet != null && ObjectUtil.isEmpty(wallet.getWeixin())) {
+        wallet.setWeixin(request.getWeixin());
+        wallet.setPayType(WalletPayType.WX.getCode());
+        saveOrUpdate(wallet);
+        return saveOrUpdate(wallet);
+      }
     }
-    return wrapper.update();
+    return false;
   }
 }

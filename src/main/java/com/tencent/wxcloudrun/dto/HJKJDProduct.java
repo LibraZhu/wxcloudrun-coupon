@@ -29,7 +29,6 @@ public class HJKJDProduct {
   private String shopname; // 店铺名称
   private String searchId; //
   private String discountWph; // 唯品会折扣
-  private String tkl; // 抖音口令
-  private String click_url;
   private Boolean is_tmall;
+  private Boolean is_fen; // 是否是一分购
 }

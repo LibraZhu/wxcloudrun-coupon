@@ -19,5 +19,7 @@ public interface ProductService {
 
   Object link(ProductLinkParam param);
 
+  Object fenLink(ProductLinkParam param);
+
   CommonPage<HJKJDProduct> hotList(ProductQueryParam param);
 }

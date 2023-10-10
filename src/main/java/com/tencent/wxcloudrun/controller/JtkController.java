@@ -36,6 +36,13 @@ public class JtkController {
     return CommonResult.success(wmService.getEleLink());
   }
 
+  @ApiOperation("话费充值推广链接。")
+  @GetMapping("/phoneBill")
+  @ResponseBody
+  public CommonResult<Object> phoneBill() {
+    return CommonResult.success(wmService.getPhoneBillLink());
+  }
+
   @ApiOperation("统一活动转链接口。0-滴滴打车；1-T3; 2-花小猪; 3-电影")
   @GetMapping("/unionLink")
   @ResponseBody

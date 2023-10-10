@@ -171,6 +171,14 @@ public class ProductServiceImpl implements ProductService {
   }
 
   @Override
+  public Object fenLink(ProductLinkParam param) {
+    if (param.getSource() == ProductSource.DY.getCode()) {
+      return dyService.getUnionUrl(param.getProductId(), "F" + RequestHolder.getUid());
+    }
+    return null;
+  }
+
+  @Override
   public CommonPage<HJKJDProduct> hotList(ProductQueryParam param) {
     if (param.getSource() == ProductSource.PDD.getCode()) {
       param.setChannelType(5);
