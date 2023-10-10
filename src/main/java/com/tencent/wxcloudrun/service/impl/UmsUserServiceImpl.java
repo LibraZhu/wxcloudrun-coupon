@@ -74,7 +74,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         articles.setPicUrl("");
         articles.setUrl("https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid=" + umsUser.getId());
         wxMessage.setArticles(Collections.singletonList(articles));
-
+        message = wxMessage;
       } else if (ObjectUtil.equals(request.getContent(), "提现")) {
         WxMessage wxMessage = new WxMessage();
         wxMessage.setFromUserName(request.getToUserName());
