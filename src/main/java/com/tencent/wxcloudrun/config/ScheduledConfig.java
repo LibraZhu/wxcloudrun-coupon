@@ -42,8 +42,9 @@ public class ScheduledConfig implements SchedulingConfigurer {
           if (ObjectUtil.isEmpty(startTime)) {
             startTime = runStartTime;
           }
-          logger.info("定时同步订单，开始时间：{}，结束时间：{}", startTime, endTime);
+          logger.info("定时同步订单，开始时间：{}", startTime);
           orderService.syncTask(startTime, endTime);
+          logger.info("定时同步订单，开始时间：{}，结束时间：{}", startTime, endTime);
           syncTaskTimeMap.put(orderSyncTime, endTime);
           sysConfigService
               .lambdaUpdate()

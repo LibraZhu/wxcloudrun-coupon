@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
 import java.util.Collections;
 
 /**
@@ -71,8 +72,11 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         WxMessage.Articles articles = new WxMessage.Articles();
         articles.setTitle("多多省");
         articles.setDescription("专属查返利");
-        articles.setPicUrl("http://wx.qlogo.cn/mmopen/ChCs6YSVOGXAVIujziagsNzibO2RrPfiaduBpgIrhf8USredCq9XhZouv2jrWzgpsVn09UAKelR9h7HkFKMBg1LKM45dQsibacBo/64");
-        articles.setUrl("https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid=" + umsUser.getId());
+        articles.setPicUrl(
+            "http://wx.qlogo.cn/mmopen/ChCs6YSVOGXAVIujziagsNzibO2RrPfiaduBpgIrhf8USredCq9XhZouv2jrWzgpsVn09UAKelR9h7HkFKMBg1LKM45dQsibacBo/64");
+        articles.setUrl(
+            "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid="
+                + umsUser.getId());
         wxMessage.setArticles(Collections.singletonList(articles));
         message = wxMessage;
       } else if (ObjectUtil.equals(request.getContent(), "提现")) {
@@ -97,7 +101,9 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
           articles.setTitle("账户余额: " + money);
           articles.setDescription("点击提交申请");
           articles.setPicUrl("");
-          articles.setUrl("https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/wallet/index?uid=" + umsUser.getId());
+          articles.setUrl(
+              "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/wallet/index?uid="
+                  + umsUser.getId());
           wxMessage.setArticles(Collections.singletonList(articles));
         }
         message = wxMessage;
@@ -153,14 +159,16 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         umsUser = new UmsUser();
         umsUser.setOpenid(openid);
         umsUser.setGOpenid(gOpendid);
+        umsUser.setCreateTime(LocalDateTime.now());
+        umsUser.setLoginTime(LocalDateTime.now());
         baseMapper.insert(umsUser);
         //
         pmsWalletService.add(umsUser.getId());
       } else {
         if (ObjectUtil.isNotEmpty(openid)) {
           umsUser.setOpenid(openid);
-          baseMapper.updateById(umsUser);
         }
+        umsUser.setLoginTime(LocalDateTime.now());
         baseMapper.updateById(umsUser);
       }
       logger.info("[{}],uid:{},openid:{},gOpendid:{}", "公众号登录", umsUser.getId(), openid, gOpendid);

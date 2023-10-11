@@ -4,12 +4,12 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /**
  * <p>
@@ -17,7 +17,7 @@ import java.io.Serializable;
  * </p>
  *
  * @author zjf
- * @since 2023年08月04日
+ * @since 2023年10月11日
  */
 @Getter
 @Setter
@@ -30,8 +30,7 @@ public class UmsUser implements Serializable {
     /**
      * 主键
      */
-    @TableId(value = "id", type = IdType.ASSIGN_ID)
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
     /**
@@ -69,6 +68,18 @@ public class UmsUser implements Serializable {
      */
     @TableField("avatar")
     private String avatar;
+
+    /**
+     * 创建时间
+     */
+    @TableField("create_time")
+    private LocalDateTime createTime;
+
+    /**
+     * 登录时间
+     */
+    @TableField("login_time")
+    private LocalDateTime loginTime;
 
 
 }
