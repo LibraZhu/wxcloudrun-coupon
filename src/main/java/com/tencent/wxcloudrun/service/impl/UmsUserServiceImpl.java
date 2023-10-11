@@ -61,7 +61,7 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         message = dyService.wxMessage(request, umsUser.getId());
       } else if (request.getContent().contains("t.vip.com")) {
         message = wpService.wxMessage(request, umsUser.getId());
-      } else if (ObjectUtil.equals(request.getContent(), "找券返")) {
+      } else if (ObjectUtil.equals(request.getContent(), "多多省")) {
         WxMessage wxMessage = new WxMessage();
         wxMessage.setFromUserName(request.getToUserName());
         wxMessage.setToUserName(request.getFromUserName());
@@ -69,9 +69,9 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         wxMessage.setMsgType("news");
         wxMessage.setArticleCount(1);
         WxMessage.Articles articles = new WxMessage.Articles();
-        articles.setTitle("找券返");
+        articles.setTitle("多多省");
         articles.setDescription("专属查返利");
-        articles.setPicUrl("");
+        articles.setPicUrl("http://wx.qlogo.cn/mmopen/ChCs6YSVOGXAVIujziagsNzibO2RrPfiaduBpgIrhf8USredCq9XhZouv2jrWzgpsVn09UAKelR9h7HkFKMBg1LKM45dQsibacBo/64");
         articles.setUrl("https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid=" + umsUser.getId());
         wxMessage.setArticles(Collections.singletonList(articles));
         message = wxMessage;
