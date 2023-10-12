@@ -52,33 +52,33 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
       if (request.getContent().startsWith("https://item.m.jd.com")
           || request.getContent().startsWith("https://item.jd.com")) {
         message = jdService.wxMessage(request, umsUser.getId());
+        if (ObjectUtil.equals(message, "success")) {
+          message = noProductWxMessage(request, umsUser);
+        }
       } else if (request.getContent().contains("yangkeduo.com")) {
         message = pddService.wxMessage(request, umsUser.getId());
+        if (ObjectUtil.equals(message, "success")) {
+          message = noProductWxMessage(request, umsUser);
+        }
       } else if (request.getContent().contains("m.tb.cn")
           || request.getContent().contains("item.taobao.com")
           || request.getContent().contains("detail.tmall.com")) {
         message = tbService.wxMessage(request, umsUser.getId());
+        if (ObjectUtil.equals(message, "success")) {
+          message = noProductWxMessage(request, umsUser);
+        }
       } else if (request.getContent().contains("v.douyin.com")) {
         message = dyService.wxMessage(request, umsUser.getId());
+        if (ObjectUtil.equals(message, "success")) {
+          message = noProductWxMessage(request, umsUser);
+        }
       } else if (request.getContent().contains("t.vip.com")) {
         message = wpService.wxMessage(request, umsUser.getId());
+        if (ObjectUtil.equals(message, "success")) {
+          message = noProductWxMessage(request, umsUser);
+        }
       } else if (ObjectUtil.equals(request.getContent(), "多多省")) {
-        WxMessage wxMessage = new WxMessage();
-        wxMessage.setFromUserName(request.getToUserName());
-        wxMessage.setToUserName(request.getFromUserName());
-        wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
-        wxMessage.setMsgType("news");
-        wxMessage.setArticleCount(1);
-        WxMessage.Articles articles = new WxMessage.Articles();
-        articles.setTitle("多多省");
-        articles.setDescription("专属查返利");
-        articles.setPicUrl(
-            "http://wx.qlogo.cn/mmopen/ChCs6YSVOGXAVIujziagsNzibO2RrPfiaduBpgIrhf8USredCq9XhZouv2jrWzgpsVn09UAKelR9h7HkFKMBg1LKM45dQsibacBo/64");
-        articles.setUrl(
-            "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid="
-                + umsUser.getId());
-        wxMessage.setArticles(Collections.singletonList(articles));
-        message = wxMessage;
+        message = defaultWxMessage(request, umsUser, "多多省", "点击查看更多优惠");
       } else if (ObjectUtil.equals(request.getContent(), "提现")) {
         WxMessage wxMessage = new WxMessage();
         wxMessage.setFromUserName(request.getToUserName());
@@ -116,6 +116,30 @@ public class UmsUserServiceImpl extends ServiceImpl<UmsUserMapper, UmsUser>
         JsonUtil.toJson(request),
         ObjectUtil.equals(message, "success") ? "success" : JsonUtil.toJson(message));
     return message;
+  }
+
+  private WxMessage noProductWxMessage(WxMessageRequest request, UmsUser umsUser) {
+    return defaultWxMessage(request, umsUser, "未找到商品", "点击查看更多相似优惠商品");
+  }
+
+  private WxMessage defaultWxMessage(
+      WxMessageRequest request, UmsUser umsUser, String title, String des) {
+    WxMessage wxMessage = new WxMessage();
+    wxMessage.setFromUserName(request.getToUserName());
+    wxMessage.setToUserName(request.getFromUserName());
+    wxMessage.setCreateTime(String.valueOf((int) (System.currentTimeMillis() / 1000)));
+    wxMessage.setMsgType("news");
+    wxMessage.setArticleCount(1);
+    WxMessage.Articles articles = new WxMessage.Articles();
+    articles.setTitle(title);
+    articles.setDescription(des);
+    articles.setPicUrl(
+        "http://wx.qlogo.cn/mmopen/ChCs6YSVOGXAVIujziagsNzibO2RrPfiaduBpgIrhf8USredCq9XhZouv2jrWzgpsVn09UAKelR9h7HkFKMBg1LKM45dQsibacBo/64");
+    articles.setUrl(
+        "https://prod-2glx9khga5692d1f-1314654459.tcloudbaseapp.com/#/search/index?uid="
+            + umsUser.getId());
+    wxMessage.setArticles(Collections.singletonList(articles));
+    return wxMessage;
   }
 
   @Override

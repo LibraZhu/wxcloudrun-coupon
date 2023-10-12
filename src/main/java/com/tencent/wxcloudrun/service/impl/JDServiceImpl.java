@@ -205,7 +205,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       order.setRate(jdProperties.getRate());
                       // 先显示预估佣金
                       BigDecimal commission = new BigDecimal(item.getEstimateFee().toString());
-                      if (ObjectUtil.equals(item.getActualFee(), 0.0)) {
+                      if (ObjectUtil.notEqual(item.getActualFee(), 0.0)) {
                         commission = new BigDecimal(item.getActualFee().toString());
                       }
                       // 金额小于0.02不算返利
