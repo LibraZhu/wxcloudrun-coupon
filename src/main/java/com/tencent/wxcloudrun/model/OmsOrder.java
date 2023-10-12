@@ -181,12 +181,6 @@ public class OmsOrder implements Serializable {
     private String uid;
 
     /**
-     * 推广位ID
-     */
-    @TableField("position_id")
-    private String positionId;
-
-    /**
      * 订单状态描述
      */
     @TableField("status_des")

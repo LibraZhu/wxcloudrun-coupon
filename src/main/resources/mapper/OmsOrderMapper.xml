@@ -30,7 +30,6 @@
         <result column="actual_fee" property="actualFee"/>
         <result column="status" property="status"/>
         <result column="uid" property="uid"/>
-        <result column="position_id" property="positionId"/>
         <result column="status_des" property="statusDes"/>
         <result column="rate" property="rate"/>
         <result column="rebate" property="rebate"/>
@@ -42,7 +41,7 @@
         , order_source, order_id, order_sn, order_time, modify_time, finish_time, settle_time, order_emt, plus,
         compared,
         union_id, pid, sku_id, sku_name, sku_num, image_url, price, commission_rate, final_rate, estimate_cos_price,
-        estimate_fee, actual_cos_price, actual_fee, status, uid, position_id, statusDes, rate, rebate
+        estimate_fee, actual_cos_price, actual_fee, status, uid, statusDes, rate, rebate
     </sql>
 
     <insert id="saveOrUpdateList" keyProperty="id" useGeneratedKeys="true">
@@ -50,7 +49,7 @@
         settle_time, order_emt,
         plus, compared, union_id, pid, sku_id, sku_name, sku_num, image_url, price, commission_rate,
         final_rate, estimate_cos_price, estimate_fee, actual_cos_price, actual_fee, status,
-        uid, position_id, status_des, rate, rebate)
+        uid, status_des, rate, rebate)
         values
         <foreach collection="list" item="entity" separator=",">
             (#{entity.id},#{entity.orderSource}, #{entity.orderId}, #{entity.orderSn}, #{entity.orderTime},
@@ -60,7 +59,7 @@
             #{entity.imageUrl},#{entity.price}, #{entity.commissionRate}, #{entity.finalRate},
             #{entity.estimateCosPrice},
             #{entity.estimateFee},#{entity.actualCosPrice}, #{entity.actualFee}, #{entity.status},
-            #{entity.uid},#{entity.positionId},#{entity.statusDes},#{entity.rate},#{entity.rebate})
+            #{entity.uid},#{entity.statusDes},#{entity.rate},#{entity.rebate})
         </foreach>
         on duplicate key update
         order_time = values(order_time),

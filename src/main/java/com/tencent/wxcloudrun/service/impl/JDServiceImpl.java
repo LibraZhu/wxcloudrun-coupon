@@ -15,7 +15,6 @@ import com.jd.open.api.sdk.response.kplunion.UnionOpenGoodsJingfenQueryResponse;
 import com.jd.open.api.sdk.response.kplunion.UnionOpenOrderRowQueryResponse;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
-import com.tencent.wxcloudrun.config.properties.HDKProperties;
 import com.tencent.wxcloudrun.config.properties.HJKProperties;
 import com.tencent.wxcloudrun.config.properties.JDProperties;
 import com.tencent.wxcloudrun.dao.OmsOrderMapper;
@@ -30,12 +29,7 @@ import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -52,8 +46,6 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   @Resource private JDProperties jdProperties;
 
   @Resource private HJKProperties hjkProperties;
-
-  @Resource private HDKProperties hdkProperties;
 
   @Value("${spring.profiles.active}")
   private String env;
@@ -175,7 +167,6 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       }
                       order.setPlus(item.getPlus());
                       order.setUnionId(item.getUnionId().toString());
-                      order.setPositionId(item.getPositionId().toString());
                       order.setPid(item.getPid());
                       order.setSkuId(item.getSkuId().toString());
                       order.setSkuName(item.getSkuName());
@@ -201,7 +192,10 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                         order.setStatusDes(
                             order.getStatus() + "-" + statusMap.get(order.getStatus()));
                       }
-                      order.setUid(item.getSubUnionId());
+                      order.setUid(
+                          Optional.ofNullable(item.getPositionId())
+                              .map(Object::toString)
+                              .orElse(""));
                       order.setRate(jdProperties.getRate());
                       // 先显示预估佣金
                       BigDecimal commission = new BigDecimal(item.getEstimateFee().toString());
@@ -394,11 +388,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                             getRebate(
                                 item.getCommissionInfo().getCouponCommission().toString(),
                                 item.getCommissionInfo().getCommissionShare().toString(),
-                                item.getCommissionInfo().getPlusCommissionShare() == null
-                                    ? null
-                                    : item.getCommissionInfo()
-                                        .getPlusCommissionShare()
-                                        .toString()));
+                                true));
                       }
                       product.setOwner(item.getOwner());
                       product.setSource(ProductSource.JD.getCode());
@@ -447,7 +437,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         logger,
         env,
         "[{}],Request:{},Response:{}",
-        "hjk京东商品列表",
+        "hjk京东搜索商品",
         JsonUtil.toJson(searchParams),
         JsonUtil.toJson(hjkjdProductListResponse));
     if (hjkjdProductListResponse == null) {
@@ -465,10 +455,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       list.forEach(
           product -> {
             product.setRebate(
-                getRebate(
-                    product.getCommission(),
-                    product.getCommissionshare(),
-                    product.getPlusCommissionShare()));
+                getRebate(product.getCommission(), product.getCommissionshare(), false));
             product.setSource(ProductSource.JD.getCode());
             if (product.getSales() >= 10000) {
               product.setSalesTip(
@@ -521,11 +508,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       HJKJDProduct product =
           JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKJDProduct.class);
       // 计算返利
-      product.setRebate(
-          getRebate(
-              product.getCommission(),
-              product.getCommissionshare(),
-              product.getPlusCommissionShare()));
+      product.setRebate(getRebate(product.getCommission(), product.getCommissionshare(), false));
       product.setSource(ProductSource.JD.getCode());
       if (product.getSales() >= 10000) {
         product.setSalesTip(
@@ -546,24 +529,20 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   @Override
   public String getUnionUrl(String id, String coupon_url, String uid) {
     // 获取推广链接
-    String hdkApi = hdkProperties.getApiUrl() + "/get_jditems_link";
-    MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
-    map.add("apikey", hdkProperties.getApiKey());
+    String api = hjkProperties.getApiUrl() + "/jd/getunionurl";
+    Map<String, Object> map = new HashMap<>();
+    map.put("apikey", hjkProperties.getApiKey());
     try {
-      map.add("material_id", Long.valueOf(id));
+      map.put("goods_id", Long.valueOf(id));
     } catch (Exception e) {
       e.printStackTrace();
       Asserts.fail("商品ID不正确");
     }
-    map.add("coupon_url", coupon_url);
-    map.add("union_id", jdProperties.getUnionId());
-    map.add("pid", jdProperties.getPid());
-    map.add("subUnionId", uid);
-    HttpHeaders httpHeaders = new HttpHeaders();
-    httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-    HttpEntity<MultiValueMap<String, Object>> param = new HttpEntity<>(map, httpHeaders);
+    map.put("coupon_url", coupon_url);
+    map.put("positionid", Long.valueOf(uid));
+    map.put("type", 1);
     HDKJDProductLinkResponse productLinkResponse =
-        RestTemplateUtil.getInstance().postForObject(hdkApi, param, HDKJDProductLinkResponse.class);
+        RestTemplateUtil.getInstance().postForObject(api, map, HDKJDProductLinkResponse.class);
     XLogger.log(
         logger,
         env,
@@ -572,7 +551,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
         JsonUtil.toJson(map),
         JsonUtil.toJson(productLinkResponse));
     if (productLinkResponse != null && productLinkResponse.getData() != null) {
-      return productLinkResponse.getData().getShort_url();
+      return productLinkResponse.getData();
     }
     return null;
   }
@@ -582,19 +561,16 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
    *
    * @param commission 预估佣金
    * @param commissionShare 佣金比例
-   * @param plusCommissionShare plus佣金比例，plus用户购买推广者能获取到的佣金比例
+   * @param jdsdk 是否是jd sdk接口返回数据
    * @return 返利金额
    */
-  private String getRebate(String commission, String commissionShare, String plusCommissionShare) {
+  private String getRebate(String commission, String commissionShare, boolean jdsdk) {
     if (new BigDecimal(commission).compareTo(new BigDecimal("0.02")) < 1) {
       return "0";
     }
     BigDecimal rebate = new BigDecimal(commission).multiply(new BigDecimal(jdProperties.getRate()));
-    if (ObjectUtil.isNotEmpty(plusCommissionShare)) {
-      rebate =
-          rebate.multiply(
-              new BigDecimal(plusCommissionShare)
-                  .divide(new BigDecimal(commissionShare), 2, RoundingMode.DOWN));
+    if (jdsdk) {
+      rebate = rebate.multiply(new BigDecimal("0.9"));
     }
     return rebate.setScale(2, RoundingMode.DOWN).stripTrailingZeros().toPlainString();
   }

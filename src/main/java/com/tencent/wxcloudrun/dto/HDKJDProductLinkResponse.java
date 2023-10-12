@@ -6,10 +6,5 @@ import lombok.Data;
 public class HDKJDProductLinkResponse {
   private int code;
   private String msg;
-  private HDKJDProductLinkDetail data;
-
-  @Data
-  public static class HDKJDProductLinkDetail {
-    private String short_url;
-  }
+  private String data;
 }
