@@ -387,8 +387,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                         product.setRebate(
                             getRebate(
                                 item.getCommissionInfo().getCouponCommission().toString(),
-                                item.getCommissionInfo().getCommissionShare().toString(),
-                                true));
+                                ObjectUtil.notEqual(item.getOwner(), "g"))); //
                       }
                       product.setOwner(item.getOwner());
                       product.setSource(ProductSource.JD.getCode());
@@ -454,8 +453,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       // 计算返利
       list.forEach(
           product -> {
-            product.setRebate(
-                getRebate(product.getCommission(), product.getCommissionshare(), false));
+            product.setRebate(getRebate(product.getCommission(), false));
             product.setSource(ProductSource.JD.getCode());
             if (product.getSales() >= 10000) {
               product.setSalesTip(
@@ -508,7 +506,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       HJKJDProduct product =
           JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKJDProduct.class);
       // 计算返利
-      product.setRebate(getRebate(product.getCommission(), product.getCommissionshare(), false));
+      product.setRebate(getRebate(product.getCommission(), false));
       product.setSource(ProductSource.JD.getCode());
       if (product.getSales() >= 10000) {
         product.setSalesTip(
@@ -560,11 +558,10 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
    * 获取返利金额
    *
    * @param commission 预估佣金
-   * @param commissionShare 佣金比例
-   * @param jdsdk 是否是jd sdk接口返回数据
+   * @param jdsdk 是否是jd sdk接口返回数据: 自营商品：预估佣金 = 佣金 x 1; 非营商品：预估佣金 = 佣金 x 0.9
    * @return 返利金额
    */
-  private String getRebate(String commission, String commissionShare, boolean jdsdk) {
+  private String getRebate(String commission, boolean jdsdk) {
     if (new BigDecimal(commission).compareTo(new BigDecimal("0.02")) < 1) {
       return "0";
     }

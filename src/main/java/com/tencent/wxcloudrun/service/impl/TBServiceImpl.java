@@ -216,7 +216,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
           getUidBySpecialId(sidList);
         }
-        if (ObjectUtil.equals(orderPage.getHas_next(), "true")) {
+        if (orderPage != null && ObjectUtil.equals(orderPage.getHas_next(), "true")) {
           // 是否还有更多
           try {
             Thread.sleep(1000);
