@@ -24,7 +24,7 @@ public class HJKTBOrderResponse extends HJKResponse {
 
   @Data
   public static class OrderResult {
-    private List<OrderDto> publisher_order_dto;
+    private Object publisher_order_dto;
   }
 
   @NoArgsConstructor
@@ -37,32 +37,20 @@ public class HJKTBOrderResponse extends HJKResponse {
     private String tkPaidTime;
     @JsonProperty("pay_price")
     private String payPrice;
-    @JsonProperty("pub_share_fee")
-    private String pubShareFee;
     @JsonProperty("trade_id")
     private String tradeId;
-    @JsonProperty("tk_order_role")
-    private Integer tkOrderRole;
     @JsonProperty("tk_earning_time")
     private String tkEarningTime;
-    @JsonProperty("adzone_id")
-    private Long adzoneId;
     @JsonProperty("pub_share_rate")
     private String pubShareRate;
     @JsonProperty("unid")
     private String unid;
-    @JsonProperty("refund_tag")
-    private Integer refundTag;
     @JsonProperty("subsidy_rate")
     private String subsidyRate;
     @JsonProperty("tk_total_rate")
     private String tkTotalRate;
-    @JsonProperty("item_category_name")
-    private String itemCategoryName;
-    @JsonProperty("seller_nick")
-    private String sellerNick;
     @JsonProperty("pub_id")
-    private Integer pubId;
+    private String pubId;
     @JsonProperty("alimama_rate")
     private String alimamaRate;
     @JsonProperty("subsidy_type")
@@ -78,7 +66,7 @@ public class HJKTBOrderResponse extends HJKResponse {
     @JsonProperty("site_name")
     private String siteName;
     @JsonProperty("item_num")
-    private Integer itemNum;
+    private String itemNum;
     @JsonProperty("subsidy_fee")
     private String subsidyFee;
     @JsonProperty("alimama_share_fee")
@@ -96,7 +84,7 @@ public class HJKTBOrderResponse extends HJKResponse {
     @JsonProperty("click_time")
     private String clickTime;
     @JsonProperty("tk_status")
-    private Integer tkStatus;
+    private String tkStatus;
     @JsonProperty("item_price")
     private String itemPrice;
     @JsonProperty("item_id")
@@ -107,8 +95,6 @@ public class HJKTBOrderResponse extends HJKResponse {
     private String totalCommissionRate;
     @JsonProperty("item_link")
     private String itemLink;
-    @JsonProperty("site_id")
-    private Integer siteId;
     @JsonProperty("seller_shop_title")
     private String sellerShopTitle;
     @JsonProperty("income_rate")
@@ -116,9 +102,9 @@ public class HJKTBOrderResponse extends HJKResponse {
     @JsonProperty("total_commission_fee")
     private String totalCommissionFee;
     @JsonProperty("special_id")
-    private Integer specialId;
+    private String specialId;
     @JsonProperty("relation_id")
-    private Integer relationId;
+    private String relationId;
     @JsonProperty("deposit_price")
     private String depositPrice;
     @JsonProperty("tb_deposit_time")
@@ -127,8 +113,6 @@ public class HJKTBOrderResponse extends HJKResponse {
     private String tkDepositTime;
     @JsonProperty("tp_order_id")
     private String tpOrderId;
-    @JsonProperty("marketing_type")
-    private String marketingType;
     @JsonProperty("modified_time")
     private String modifiedTime;
     @JsonProperty("talent_pid")
@@ -139,21 +123,5 @@ public class HJKTBOrderResponse extends HJKResponse {
     private String extraMktId;
     @JsonProperty("untts")
     private String untts;
-    @JsonProperty("pub_share_pre_fee_for_commission")
-    private String pubSharePreFeeForCommission;
-    @JsonProperty("pub_share_fee_for_commission")
-    private String pubShareFeeForCommission;
-    @JsonProperty("pub_share_rate_for_sdy")
-    private String pubShareRateForSdy;
-    @JsonProperty("tk_total_rate_for_sdy")
-    private String tkTotalRateForSdy;
-    @JsonProperty("pub_share_pre_fee_for_sdy")
-    private String pubSharePreFeeForSdy;
-    @JsonProperty("pub_share_fee_for_sdy")
-    private String pubShareFeeForSdy;
-    @JsonProperty("platform_special_service_rate")
-    private String platformSpecialServiceRate;
-    @JsonProperty("platform_special_service_fee")
-    private String platformSpecialServiceFee;
   }
 }

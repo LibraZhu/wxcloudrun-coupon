@@ -5,11 +5,17 @@ import cn.hutool.core.net.URLDecoder;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.taobao.api.ApiException;
 import com.taobao.api.DefaultTaobaoClient;
 import com.taobao.api.request.TbkDgMaterialOptionalRequest;
 import com.taobao.api.request.TbkDgOptimusMaterialRequest;
+import com.taobao.api.request.TbkItemInfoGetRequest;
+import com.taobao.api.request.TbkTpwdCreateRequest;
 import com.taobao.api.response.TbkDgMaterialOptionalResponse;
 import com.taobao.api.response.TbkDgOptimusMaterialResponse;
+import com.taobao.api.response.TbkItemInfoGetResponse;
+import com.taobao.api.response.TbkTpwdCreateResponse;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.HJKProperties;
@@ -122,99 +128,108 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       if (response.getData() instanceof Map) {
         HJKTBOrderResponse.OrderPage orderPage =
             JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBOrderResponse.OrderPage.class);
-
-        if (orderPage != null
-            && ObjectUtil.isNotNull(orderPage.getResults())
-            && ObjectUtil.isNotEmpty(orderPage.getResults().getPublisher_order_dto())) {
-          List<String> sidList = new ArrayList<>();
-          List<OmsOrder> list =
-              orderPage.getResults().getPublisher_order_dto().stream()
-                  .map(
-                      item -> {
-                        OmsOrder order = new OmsOrder();
-                        order.setOrderSource(ProductSource.TB.getCode());
-                        order.setOrderId(item.getTradeId());
-                        order.setOrderSn(item.getTradeParentId());
-                        order.setOrderEmt(2);
-                        if (ObjectUtil.isNotEmpty(item.getTkPaidTime())) {
-                          order.setOrderTime(
-                              LocalDateTime.parse(
-                                  item.getTkPaidTime(),
-                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        }
-                        if (ObjectUtil.isNotEmpty(item.getModifiedTime())
-                            && ObjectUtil.equals(item.getTkStatus(), 14)) {
-                          order.setFinishTime(
-                              LocalDateTime.parse(
-                                  item.getModifiedTime(),
-                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        }
-                        if (ObjectUtil.isNotEmpty(item.getModifiedTime())) {
-                          order.setModifyTime(
-                              LocalDateTime.parse(
-                                  item.getModifiedTime(),
-                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        }
-                        if (ObjectUtil.isNotEmpty(item.getTkEarningTime())) {
-                          order.setSettleTime(
-                              LocalDateTime.parse(
-                                  item.getTkEarningTime(),
-                                  DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-                        }
-                        order.setPid(
-                            Optional.ofNullable(item.getPubId()).map(Object::toString).orElse(""));
-                        order.setSkuId(item.getItemId());
-                        order.setSkuName(item.getItemTitle());
-                        order.setSkuNum(Long.valueOf(item.getItemNum()));
-                        order.setImageUrl(item.getItemImg());
-                        order.setPrice(item.getPayPrice());
-                        order.setCommissionRate(item.getTotalCommissionRate());
-                        order.setActualCosPrice(item.getPayPrice());
-                        order.setActualFee(item.getTotalCommissionFee());
-                        if (ObjectUtil.equals(item.getTkStatus(), 12)) {
-                          order.setStatus(OrderStatus.DELIVER.getCode());
-                        } else if (ObjectUtil.equals(item.getTkStatus(), 14)) {
-                          order.setStatus(OrderStatus.COMPLETE.getCode());
-                        } else if (ObjectUtil.equals(item.getTkEarningTime(), 13)) {
-                          order.setStatus(OrderStatus.INVALID.getCode());
-                        }
-                        String sid =
-                            Optional.ofNullable(item.getSpecialId())
-                                .map(Object::toString)
-                                .orElse("");
-                        order.setUid(sid);
-
-                        // 缓存所有的sid，后续获取uid
-                        if (ObjectUtil.isNotEmpty(sid) && !sidList.contains(sid)) {
-                          sidList.add(sid);
-                        }
-                        order.setRate(tbProperties.getRate());
-                        // 金额小于0.02不算返利
-                        order.setRebate(
-                            new BigDecimal(item.getTotalCommissionFee())
-                                        .compareTo(new BigDecimal("0.02"))
-                                    >= 1
-                                ? new BigDecimal(item.getTotalCommissionFee())
-                                    .multiply(new BigDecimal(order.getRate()))
-                                    .setScale(2, RoundingMode.DOWN)
-                                    .toString()
-                                : "0.00");
-                        return order;
-                      })
-                  .collect(Collectors.toList());
-          if (list.size() > 0) {
-            baseMapper.saveOrUpdateList(list);
+        if (orderPage != null && orderPage.getResults() != null) {
+          List<HJKTBOrderResponse.OrderDto> orderList = new ArrayList<>();
+          Object data = orderPage.getResults().getPublisher_order_dto();
+          if (data instanceof Map) {
+            orderList.add(JsonUtil.toObj(JsonUtil.toJson(data), HJKTBOrderResponse.OrderDto.class));
+          } else if (data instanceof List) {
+            orderList =
+                JsonUtil.toList(
+                    JsonUtil.toJson(data),
+                    new TypeReference<List<HJKTBOrderResponse.OrderDto>>() {});
           }
-          XLogger.log(
-              logger,
-              env,
-              "同步淘宝订单:[{}~{}],第{}页,{}",
-              startTime,
-              endTime,
-              page,
-              JsonUtil.toJson(list));
+          if (orderList != null && orderList.size() > 0) {
+            List<String> sidList = new ArrayList<>();
+            List<OmsOrder> list =
+                orderList.stream()
+                    .map(
+                        item -> {
+                          OmsOrder order = new OmsOrder();
+                          order.setOrderSource(ProductSource.TB.getCode());
+                          order.setOrderId(item.getTradeId());
+                          order.setOrderSn(item.getTradeParentId());
+                          order.setOrderEmt(2);
+                          if (ObjectUtil.isNotEmpty(item.getTkPaidTime())) {
+                            order.setOrderTime(
+                                LocalDateTime.parse(
+                                    item.getTkPaidTime(),
+                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                          }
+                          if (ObjectUtil.isNotEmpty(item.getModifiedTime())
+                              && ObjectUtil.equals(item.getTkStatus(), 14)) {
+                            order.setFinishTime(
+                                LocalDateTime.parse(
+                                    item.getModifiedTime(),
+                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                          }
+                          if (ObjectUtil.isNotEmpty(item.getModifiedTime())) {
+                            order.setModifyTime(
+                                LocalDateTime.parse(
+                                    item.getModifiedTime(),
+                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                          }
+                          if (ObjectUtil.isNotEmpty(item.getTkEarningTime())) {
+                            order.setSettleTime(
+                                LocalDateTime.parse(
+                                    item.getTkEarningTime(),
+                                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+                          }
+                          order.setPid(
+                              Optional.ofNullable(item.getPubId())
+                                  .map(Object::toString)
+                                  .orElse(""));
+                          order.setSkuId(item.getItemId());
+                          order.setSkuName(item.getItemTitle());
+                          order.setSkuNum(Long.valueOf(item.getItemNum()));
+                          order.setImageUrl(item.getItemImg());
+                          order.setPrice(Optional.ofNullable(item.getPayPrice()).orElse("0"));
+                          order.setCommissionRate(item.getTotalCommissionRate());
+                          order.setActualCosPrice(
+                              Optional.ofNullable(item.getPayPrice()).orElse("0"));
+                          order.setActualFee(item.getTotalCommissionFee());
+                          if (ObjectUtil.equals(item.getTkStatus(), "12")) {
+                            order.setStatus(OrderStatus.DELIVER.getCode());
+                          } else if (ObjectUtil.equals(item.getTkStatus(), "14")) {
+                            order.setStatus(OrderStatus.COMPLETE.getCode());
+                          } else if (ObjectUtil.equals(item.getTkEarningTime(), "13")) {
+                            order.setStatus(OrderStatus.INVALID.getCode());
+                          }
+                          String sid = Optional.ofNullable(item.getSpecialId()).orElse("");
+                          order.setUid(sid);
 
-          getUidBySpecialId(sidList);
+                          // 缓存所有的sid，后续获取uid
+                          if (ObjectUtil.isNotEmpty(sid) && !sidList.contains(sid)) {
+                            sidList.add(sid);
+                          }
+                          order.setRate(tbProperties.getRate());
+                          // 金额小于0.02不算返利
+                          order.setRebate(
+                              new BigDecimal(item.getTotalCommissionFee())
+                                          .compareTo(new BigDecimal("0.02"))
+                                      >= 1
+                                  ? new BigDecimal(item.getTotalCommissionFee())
+                                      .multiply(new BigDecimal(order.getRate()))
+                                      .setScale(2, RoundingMode.DOWN)
+                                      .toString()
+                                  : "0.00");
+                          return order;
+                        })
+                    .collect(Collectors.toList());
+            if (list.size() > 0) {
+              baseMapper.saveOrUpdateList(list);
+            }
+            XLogger.log(
+                logger,
+                env,
+                "同步淘宝订单:[{}~{}],第{}页,{}",
+                startTime,
+                endTime,
+                page,
+                JsonUtil.toJson(list));
+
+            getUidBySpecialId(sidList);
+          }
         }
         if (orderPage != null && ObjectUtil.equals(orderPage.getHas_next(), "true")) {
           // 是否还有更多
@@ -380,13 +395,20 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       product.setGoods_id(item.getItemId());
                       product.setGoods_name(item.getTitle());
                       product.setGoods_desc(item.getItemDescription());
+                      product.setPrice(item.getZkFinalPrice());
+                      product.setDiscount(item.getCouponAmount().toString());
+                      if (ObjectUtil.isNotNull(item.getCouponAmount())) {
+                        product.setPrice_after(
+                            new BigDecimal(item.getZkFinalPrice())
+                                .subtract(new BigDecimal(item.getCouponAmount()))
+                                .toString());
+                      } else {
+                        product.setPrice_after(item.getZkFinalPrice());
+                      }
                       BigDecimal commission =
-                          new BigDecimal(item.getZkFinalPrice())
+                          new BigDecimal(product.getPrice_after())
                               .multiply(new BigDecimal(item.getCommissionRate()))
                               .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
-                      product.setPrice(item.getReservePrice());
-                      product.setPrice_after(item.getZkFinalPrice());
-                      product.setDiscount(item.getCouponAmount().toString());
                       product.setRebate(getRebate(commission));
                       if (StrUtil.equals(env, "dev")) {
                         product.setCommissionshare(
@@ -496,13 +518,20 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       product.setGoods_id(item.getItemId());
                       product.setGoods_name(item.getTitle());
                       product.setGoods_desc(item.getItemDescription());
+                      product.setPrice(item.getZkFinalPrice());
+                      product.setDiscount(item.getCouponAmount());
+                      if (ObjectUtil.isNotNull(item.getCouponAmount())) {
+                        product.setPrice_after(
+                            new BigDecimal(item.getZkFinalPrice())
+                                .subtract(new BigDecimal(item.getCouponAmount()))
+                                .toString());
+                      } else {
+                        product.setPrice_after(item.getZkFinalPrice());
+                      }
                       BigDecimal commission =
-                          new BigDecimal(item.getZkFinalPrice())
+                          new BigDecimal(product.getPrice_after())
                               .multiply(new BigDecimal(item.getCommissionRate()))
                               .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
-                      product.setPrice(item.getReservePrice());
-                      product.setPrice_after(item.getZkFinalPrice());
-                      product.setDiscount(item.getCouponAmount());
                       product.setRebate(getRebate(commission));
                       if (StrUtil.equals(env, "dev")) {
                         product.setCommissionshare(
@@ -548,72 +577,32 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   @Override
   public HJKJDProduct getProductDetail(String id) {
-    String api = hjkProperties.getApiUrl() + "/tb/getunionurl";
-    Map<String, Object> map =
-        new HashMap<String, Object>() {
-          {
-            put("apikey", hjkProperties.getApiKey());
-            put("item_id", id);
-          }
-        };
-    HJKTBLinkResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, map, HJKTBLinkResponse.class);
-    XLogger.log(
-        logger,
-        env,
-        "[{}],Request:{},Response:{}",
-        "淘宝商品详情",
-        JsonUtil.toJson(map),
-        JsonUtil.toJson(response));
-    if (response != null && response.getData() != null && response.getData() instanceof Map) {
-      HJKTBLinkResponse.TbLink item =
-          JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBLinkResponse.TbLink.class);
-      HJKJDProduct product = new HJKJDProduct();
-      product.setGoods_id(item.getItemId());
-      product.setGoods_name(item.getTitle());
-      BigDecimal commission =
-          new BigDecimal(item.getZkFinalPrice())
-              .multiply(new BigDecimal(item.getCommissionRate()))
-              .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
-      product.setPrice(item.getReservePrice());
-      product.setPrice_after(item.getZkFinalPrice());
-      product.setDiscount(
-          new BigDecimal(item.getReservePrice())
-              .subtract(new BigDecimal(item.getZkFinalPrice()))
-              .stripTrailingZeros()
-              .toPlainString());
-      product.setRebate(getRebate(commission));
-      if (StrUtil.equals(env, "dev")) {
-        product.setCommissionshare(
-            new BigDecimal(item.getCommissionRate())
-                .divide(new BigDecimal("100"), 1, RoundingMode.DOWN)
-                .toString());
-        product.setCommission(commission.stripTrailingZeros().toPlainString());
-      }
-      product.setPicurl(item.getPictUrl());
-      if (ObjectUtil.isEmpty(item.getSmallImages())) {
-        product.setPicurls(item.getPictUrl());
-      } else {
-        product.setPicurls(String.join(",", item.getSmallImages().getString()));
-      }
-      try {
-        if (Long.parseLong(item.getVolume()) >= 10000) {
-          product.setSalesTip(
-              String.format(
-                  "月售%s万+件",
-                  new BigDecimal(item.getVolume())
-                      .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
-                      .stripTrailingZeros()
-                      .toPlainString()));
+    try {
+      TbkItemInfoGetRequest request = new TbkItemInfoGetRequest();
+      request.setNumIids(id);
+      request.setPlatform(2L);
+      TbkItemInfoGetResponse response = getTBClient().execute(request);
+      XLogger.log(
+          logger,
+          env,
+          "[{}],Request:{},Response:{}",
+          "淘宝商品详情",
+          JsonUtil.toJson(request),
+          JsonUtil.toJson(response));
+      if (ObjectUtil.isNotEmpty(response.getResults())) {
+        TbkItemInfoGetResponse.NTbkItem item = response.getResults().get(0);
+        HJKJDProduct product = new HJKJDProduct();
+        product.setGoods_id(item.getNumIid());
+        if (ObjectUtil.isEmpty(item.getSmallImages())) {
+          product.setPicurls(item.getPictUrl());
         } else {
-          product.setSalesTip(String.format("月售%s件", item.getVolume()));
+          product.setPicurls(String.join(",", item.getSmallImages()));
         }
-      } catch (Exception e) {
-        product.setSalesTip(String.format("月售%s件", item.getVolume()));
+        return product;
       }
-      product.setIs_tmall(ObjectUtil.equals(item.getUserType(), "1"));
-      product.setSource(ProductSource.TB.getCode());
-      return product;
+    } catch (Exception e) {
+      e.printStackTrace();
+      Asserts.fail(e.getLocalizedMessage());
     }
     return null;
   }

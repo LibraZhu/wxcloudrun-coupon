@@ -299,7 +299,11 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       product.setGoods_name(item.getGoodsName());
                       product.setGoods_desc(item.getGoodsDesc());
 
-                      BigDecimal coupon = new BigDecimal(item.getCouponDiscount().toString());
+                      BigDecimal coupon =
+                          new BigDecimal(
+                              Optional.ofNullable(item.getCouponDiscount())
+                                  .map(Object::toString)
+                                  .orElse("0"));
                       BigDecimal price = new BigDecimal(item.getMinGroupPrice().toString());
                       BigDecimal priceEnd =
                           price
@@ -379,6 +383,11 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
       if (searchResponse.getGoodsSearchResponse() != null
           && searchResponse.getGoodsSearchResponse().getGoodsList() != null
           && searchResponse.getGoodsSearchResponse().getGoodsList().size() > 0) {
+        if (searchResponse.getGoodsSearchResponse().getGoodsList().size() == 1
+            && searchResponse.getGoodsSearchResponse().getGoodsList().get(0).getGoodsName()
+                == null) {
+          return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
+        }
         return CommonPage.page(
             param.getPage(),
             param.getPageSize(),
@@ -391,7 +400,11 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       product.setGoods_name(item.getGoodsName());
                       product.setGoods_desc(item.getGoodsDesc());
 
-                      BigDecimal coupon = new BigDecimal(item.getCouponDiscount().toString());
+                      BigDecimal coupon =
+                          new BigDecimal(
+                              Optional.ofNullable(item.getCouponDiscount())
+                                  .map(Object::toString)
+                                  .orElse("0"));
                       BigDecimal price = new BigDecimal(item.getMinGroupPrice().toString());
                       BigDecimal priceEnd =
                           price
@@ -464,7 +477,9 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
         product.setGoods_name(item.getGoodsName());
         product.setGoods_desc(item.getGoodsDesc());
 
-        BigDecimal coupon = new BigDecimal(item.getCouponDiscount().toString());
+        BigDecimal coupon =
+            new BigDecimal(
+                Optional.ofNullable(item.getCouponDiscount()).map(Object::toString).orElse("0"));
         BigDecimal price = new BigDecimal(item.getMinGroupPrice().toString());
         BigDecimal priceEnd =
             price.subtract(coupon).divide(new BigDecimal(100), 2, RoundingMode.DOWN); // 券后价
