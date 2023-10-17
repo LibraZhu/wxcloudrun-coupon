@@ -160,7 +160,7 @@
 //                      order.setRate(dyProperties.getRate());
 //                      // 金额小于0.02不算返利
 //                      order.setRebate(
-//                          new BigDecimal(item.getJtkShareFee()).compareTo(new BigDecimal("0.02"))
+//                          new BigDecimal(item.getJtkShareFee()).compareTo(new BigDecimal("0.025"))
 //                                  >= 1
 //                              ? new BigDecimal(item.getJtkShareFee())
 //                                  .multiply(new BigDecimal(order.getRate()))
@@ -419,7 +419,7 @@
 //  }
 //
 //  private String getRebate(BigDecimal commission) {
-//    if (commission.compareTo(new BigDecimal("0.02")) < 1) {
+//    if (commission.compareTo(new BigDecimal("0.025")) < 1) {
 //      return "0";
 //    }
 //    return commission

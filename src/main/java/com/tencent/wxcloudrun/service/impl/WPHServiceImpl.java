@@ -165,7 +165,7 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
                       order.setRate(wphProperties.getRate());
                       // 金额小于0.02不算返利
                       order.setRebate(
-                          new BigDecimal(detail.getCommission()).compareTo(new BigDecimal("0.02"))
+                          new BigDecimal(detail.getCommission()).compareTo(new BigDecimal("0.025"))
                                   >= 1
                               ? new BigDecimal(detail.getCommission())
                                   .multiply(new BigDecimal(order.getRate()))
@@ -511,7 +511,7 @@ public class WPHServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
   }
 
   private String getRebate(BigDecimal commission) {
-    if (commission.compareTo(new BigDecimal("0.02")) < 1) {
+    if (commission.compareTo(new BigDecimal("0.025")) < 1) {
       return "0";
     }
     return commission

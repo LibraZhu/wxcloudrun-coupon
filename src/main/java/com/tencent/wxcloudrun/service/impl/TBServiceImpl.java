@@ -6,17 +6,13 @@ import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.taobao.api.ApiException;
 import com.taobao.api.DefaultTaobaoClient;
 import com.taobao.api.request.TbkDgMaterialOptionalRequest;
 import com.taobao.api.request.TbkDgOptimusMaterialRequest;
-import com.taobao.api.request.TbkItemInfoGetRequest;
-import com.taobao.api.request.TbkTpwdCreateRequest;
 import com.taobao.api.response.TbkDgMaterialOptionalResponse;
 import com.taobao.api.response.TbkDgOptimusMaterialResponse;
-import com.taobao.api.response.TbkItemInfoGetResponse;
-import com.taobao.api.response.TbkTpwdCreateResponse;
 import com.tencent.wxcloudrun.common.api.CommonPage;
+import com.tencent.wxcloudrun.common.api.ResultCode;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.HJKProperties;
 import com.tencent.wxcloudrun.config.properties.TBProperties;
@@ -29,12 +25,18 @@ import com.tencent.wxcloudrun.model.UmsUserTb;
 import com.tencent.wxcloudrun.service.TBService;
 import com.tencent.wxcloudrun.service.UmsUserTbService;
 import com.tencent.wxcloudrun.utils.JsonUtil;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import com.tencent.wxcloudrun.utils.RestTemplateUtil;
 import com.tencent.wxcloudrun.utils.XLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import javax.annotation.Resource;
 import java.math.BigDecimal;
@@ -43,8 +45,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -140,7 +140,6 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                     new TypeReference<List<HJKTBOrderResponse.OrderDto>>() {});
           }
           if (orderList != null && orderList.size() > 0) {
-            List<String> sidList = new ArrayList<>();
             List<OmsOrder> list =
                 orderList.stream()
                     .map(
@@ -195,18 +194,13 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                           } else if (ObjectUtil.equals(item.getTkEarningTime(), "13")) {
                             order.setStatus(OrderStatus.INVALID.getCode());
                           }
-                          String sid = Optional.ofNullable(item.getSpecialId()).orElse("");
-                          order.setUid(sid);
-
-                          // 缓存所有的sid，后续获取uid
-                          if (ObjectUtil.isNotEmpty(sid) && !sidList.contains(sid)) {
-                            sidList.add(sid);
-                          }
+                          String rid = Optional.ofNullable(item.getRelationId()).orElse("");
+                          order.setUid(rid);
                           order.setRate(tbProperties.getRate());
                           // 金额小于0.02不算返利
                           order.setRebate(
                               new BigDecimal(item.getTotalCommissionFee())
-                                          .compareTo(new BigDecimal("0.02"))
+                                          .compareTo(new BigDecimal("0.025"))
                                       >= 1
                                   ? new BigDecimal(item.getTotalCommissionFee())
                                       .multiply(new BigDecimal(order.getRate()))
@@ -227,8 +221,6 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                 endTime,
                 page,
                 JsonUtil.toJson(list));
-
-            getUidBySpecialId(sidList);
           }
         }
         if (orderPage != null && ObjectUtil.equals(orderPage.getHas_next(), "true")) {
@@ -244,38 +236,6 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
     } catch (Exception e) {
       e.printStackTrace();
     }
-  }
-
-  /**
-   * 根据sid获取uid
-   *
-   * @param sidList sid列表
-   */
-  private void getUidBySpecialId(List<String> sidList) {
-    if (ObjectUtil.isEmpty(sidList)) {
-      return;
-    }
-    umsUserTbService.lambdaQuery().in(UmsUserTb::getSpecialId, sidList).select().list().stream()
-        .map(UmsUserTb::getSpecialId)
-        .forEach(sidList::remove);
-    if (ObjectUtil.isEmpty(sidList)) {
-      return;
-    }
-    ExecutorService executorService = Executors.newSingleThreadExecutor();
-    executorService.execute(
-        () -> {
-          sidList.forEach(
-              sid -> {
-                String uid = getUidBySpecialId(sid);
-                if (ObjectUtil.isNotEmpty(uid)) {
-                  UmsUserTb umsUserTb = new UmsUserTb();
-                  umsUserTb.setUid(Long.valueOf(uid));
-                  umsUserTb.setSpecialId(sid);
-                  umsUserTbService.getBaseMapper().insert(umsUserTb);
-                }
-              });
-        });
-    executorService.shutdown();
   }
 
   @Override
@@ -577,38 +537,84 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   @Override
   public HJKJDProduct getProductDetail(String id) {
-    try {
-      TbkItemInfoGetRequest request = new TbkItemInfoGetRequest();
-      request.setNumIids(id);
-      request.setPlatform(2L);
-      TbkItemInfoGetResponse response = getTBClient().execute(request);
-      XLogger.log(
-          logger,
-          env,
-          "[{}],Request:{},Response:{}",
-          "淘宝商品详情",
-          JsonUtil.toJson(request),
-          JsonUtil.toJson(response));
-      if (ObjectUtil.isNotEmpty(response.getResults())) {
-        TbkItemInfoGetResponse.NTbkItem item = response.getResults().get(0);
-        HJKJDProduct product = new HJKJDProduct();
-        product.setGoods_id(item.getNumIid());
-        if (ObjectUtil.isEmpty(item.getSmallImages())) {
-          product.setPicurls(item.getPictUrl());
-        } else {
-          product.setPicurls(String.join(",", item.getSmallImages()));
-        }
-        return product;
+    String api = hjkProperties.getApiUrl() + "/tb/getunionurl";
+    Map<String, Object> map =
+        new HashMap<String, Object>() {
+          {
+            put("apikey", hjkProperties.getApiKey());
+            put("item_id", id);
+          }
+        };
+    HJKTBLinkResponse response =
+        RestTemplateUtil.getInstance().postForObject(api, map, HJKTBLinkResponse.class);
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "淘宝商品详情",
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(response));
+    if (response != null && response.getData() != null && response.getData() instanceof Map) {
+      HJKTBLinkResponse.TbLink item =
+          JsonUtil.toObj(JsonUtil.toJson(response.getData()), HJKTBLinkResponse.TbLink.class);
+      HJKJDProduct product = new HJKJDProduct();
+      product.setGoods_id(item.getItemId());
+      product.setGoods_name(item.getTitle());
+      BigDecimal commission =
+          new BigDecimal(item.getZkFinalPrice())
+              .multiply(new BigDecimal(item.getCommissionRate()))
+              .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
+      product.setPrice(item.getReservePrice());
+      product.setPrice_after(item.getZkFinalPrice());
+      product.setDiscount(
+          new BigDecimal(item.getReservePrice())
+              .subtract(new BigDecimal(item.getZkFinalPrice()))
+              .stripTrailingZeros()
+              .toPlainString());
+      product.setRebate(getRebate(commission));
+      if (StrUtil.equals(env, "dev")) {
+        product.setCommissionshare(
+            new BigDecimal(item.getCommissionRate())
+                .divide(new BigDecimal("100"), 1, RoundingMode.DOWN)
+                .toString());
+        product.setCommission(commission.stripTrailingZeros().toPlainString());
       }
-    } catch (Exception e) {
-      e.printStackTrace();
-      Asserts.fail(e.getLocalizedMessage());
+      product.setPicurl(item.getPictUrl());
+      if (ObjectUtil.isEmpty(item.getSmallImages())) {
+        product.setPicurls(item.getPictUrl());
+      } else {
+        product.setPicurls(String.join(",", item.getSmallImages().getString()));
+      }
+      try {
+        if (Long.parseLong(item.getVolume()) >= 10000) {
+          product.setSalesTip(
+              String.format(
+                  "月售%s万+件",
+                  new BigDecimal(item.getVolume())
+                      .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
+                      .stripTrailingZeros()
+                      .toPlainString()));
+        } else {
+          product.setSalesTip(String.format("月售%s件", item.getVolume()));
+        }
+      } catch (Exception e) {
+        product.setSalesTip(String.format("月售%s件", item.getVolume()));
+      }
+      product.setIs_tmall(ObjectUtil.equals(item.getUserType(), "1"));
+      product.setSource(ProductSource.TB.getCode());
+      return product;
     }
     return null;
   }
 
   @Override
   public Object getUnionUrl(String id, String uid) {
+    UmsUserTb userTb =
+        umsUserTbService.lambdaQuery().eq(UmsUserTb::getUid, RequestHolder.getUid()).one();
+    if (ObjectUtil.isNull(userTb)) {
+      Asserts.fail(ResultCode.NO_TB_AUTH);
+    }
+
     // 获取推广链接
     String api = hjkProperties.getApiUrl() + "/tb/getunionurl";
     Map<String, Object> map =
@@ -617,7 +623,7 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
             put("apikey", hjkProperties.getApiKey());
             put("item_id", id);
             put("pid", tbProperties.getXpid());
-            put("external_id", uid);
+            put("relation_id", userTb.getRelationId());
             put("get_tkl", 1);
           }
         };
@@ -637,66 +643,49 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   }
 
   @Override
-  public String getUidBySpecialId(String specialId) {
-    // 获取推广链接
-    String api = hjkProperties.getApiUrl() + "/tb/publisherget";
-    Map<String, Object> map =
-        new HashMap<String, Object>() {
-          {
-            put("apikey", hjkProperties.getApiKey());
-            put("info_type", 2);
-            put("special_id", specialId);
-          }
-        };
-    HJKTBInviterResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, map, HJKTBInviterResponse.class);
+  public String getRelation(String uid) {
+    String api = "http://api.veapi.cn/tbk/publisherget";
+      MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+      map.add("vekey", "V78630787H40005968");
+      map.add("page_no", 0);
+      map.add("page_size", 100000);
+      HttpHeaders httpHeaders = new HttpHeaders();
+      httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+      HttpEntity<MultiValueMap<String, Object>> param = new HttpEntity<>(map, httpHeaders);
+
+      TBRelationResponse response =
+        RestTemplateUtil.getInstance().postForObject(api, param, TBRelationResponse.class);
     XLogger.log(
         logger,
         env,
-        "Method:[{}],Request:{},Response:{}",
-        "根据会员id获取uid",
+        "[{}],Request:{},Response:{}",
+        "淘宝渠道获取",
         JsonUtil.toJson(map),
         JsonUtil.toJson(response));
+    if (response != null
+        && response.getData() != null
+        && response.getData().getInviterList() != null
+        && ObjectUtil.isNotEmpty(response.getData().getInviterList().getMapData())) {
+      TBRelationResponse.DataDTO.InviterListDTO.MapDataDTO mapDataDTO =
+          response.getData().getInviterList().getMapData().stream()
+              .filter(item -> ObjectUtil.equals(item.getRtag(), uid))
+              .findFirst()
+              .orElse(null);
+      if (mapDataDTO != null) {
+        UmsUserTb userTb = new UmsUserTb();
+        userTb.setUid(Long.parseLong(uid));
+        userTb.setRelationId(mapDataDTO.getRelationId().toString());
+        userTb.setAccountName(mapDataDTO.getAccountName());
+        umsUserTbService.save(userTb);
+        return mapDataDTO.getRelationId().toString();
+      }
+    }
 
-    return Optional.ofNullable(response)
-        .map(HJKTBInviterResponse::getData)
-        .map(HJKTBInviterResponse.TbInviterData::getInviter_list)
-        .map(HJKTBInviterResponse.TbInviterList::getMap_data)
-        .map(HJKTBInviterResponse.TbMapData::getExternal_id)
-        .orElse("");
-  }
-
-  @Override
-  public String getSpecialIdByUid(String uid) {
-    // 获取推广链接
-    String api = hjkProperties.getApiUrl() + "/tb/publisherget";
-    Map<String, Object> map =
-        new HashMap<String, Object>() {
-          {
-            put("apikey", hjkProperties.getApiKey());
-            put("info_type", 2);
-            put("external_id", uid);
-          }
-        };
-    HJKTBInviterResponse response =
-        RestTemplateUtil.getInstance().postForObject(api, map, HJKTBInviterResponse.class);
-    XLogger.log(
-        logger,
-        env,
-        "Method:[{}],Request:{},Response:{}",
-        "根据uid获取淘宝会员id",
-        JsonUtil.toJson(map),
-        JsonUtil.toJson(response));
-    return Optional.ofNullable(response)
-        .map(HJKTBInviterResponse::getData)
-        .map(HJKTBInviterResponse.TbInviterData::getInviter_list)
-        .map(HJKTBInviterResponse.TbInviterList::getMap_data)
-        .map(HJKTBInviterResponse.TbMapData::getSpecial_id)
-        .orElse("");
+    return null;
   }
 
   private String getRebate(BigDecimal commission) {
-    if (commission.compareTo(new BigDecimal("0.02")) < 1) {
+    if (commission.compareTo(new BigDecimal("0.025")) < 1) {
       return "0";
     }
     return commission

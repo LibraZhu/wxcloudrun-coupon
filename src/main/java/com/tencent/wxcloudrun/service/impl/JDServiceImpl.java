@@ -204,7 +204,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
                       }
                       // 金额小于0.02不算返利
                       order.setRebate(
-                          commission.compareTo(new BigDecimal("0.02")) >= 1
+                          commission.compareTo(new BigDecimal("0.025")) >= 1
                               ? commission
                                   .multiply(new BigDecimal(order.getRate()))
                                   .setScale(2, RoundingMode.DOWN)
@@ -562,7 +562,7 @@ public class JDServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
    * @return 返利金额
    */
   private String getRebate(String commission, boolean jdsdk) {
-    if (new BigDecimal(commission).compareTo(new BigDecimal("0.02")) < 1) {
+    if (new BigDecimal(commission).compareTo(new BigDecimal("0.025")) < 1) {
       return "0";
     }
     BigDecimal rebate = new BigDecimal(commission).multiply(new BigDecimal(jdProperties.getRate()));

@@ -568,7 +568,7 @@ public class PddServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> implem
   }
 
   private String getRebate(BigDecimal commission) {
-    if (commission.compareTo(new BigDecimal("0.02")) < 1) {
+    if (commission.compareTo(new BigDecimal("0.025")) < 1) {
       return "0";
     }
     return commission

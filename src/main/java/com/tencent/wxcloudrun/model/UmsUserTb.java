@@ -41,8 +41,14 @@ public class UmsUserTb implements Serializable {
     /**
      * 淘宝会员id
      */
-    @TableField("special_id")
-    private String specialId;
+    @TableField("relation_id")
+    private String relationId;
+
+    /**
+     * 淘宝账号
+     */
+    @TableField("account_name")
+    private String accountName;
 
 
 }

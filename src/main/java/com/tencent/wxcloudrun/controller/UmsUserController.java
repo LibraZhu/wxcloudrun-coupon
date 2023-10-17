@@ -1,12 +1,12 @@
 package com.tencent.wxcloudrun.controller;
 
-import cn.hutool.json.JSON;
-import cn.hutool.json.JSONUtil;
 import com.tencent.wxcloudrun.common.api.CommonResult;
 import com.tencent.wxcloudrun.dto.UserInfoParam;
 import com.tencent.wxcloudrun.dto.WxMessageRequest;
 import com.tencent.wxcloudrun.model.UmsUser;
+import com.tencent.wxcloudrun.service.TBService;
 import com.tencent.wxcloudrun.service.UmsUserService;
+import com.tencent.wxcloudrun.utils.RequestHolder;
 import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +28,12 @@ public class UmsUserController {
   final Logger logger = LoggerFactory.getLogger(UmsUserController.class);
 
   UmsUserService umsUserService;
+  TBService tbService;
 
-  public UmsUserController(@Autowired UmsUserService umsUserService) {
+  public UmsUserController(
+      @Autowired UmsUserService umsUserService, @Autowired TBService tbService) {
     this.umsUserService = umsUserService;
+    this.tbService = tbService;
   }
 
   @ApiOperation("小程序用户登录")
@@ -61,5 +64,12 @@ public class UmsUserController {
   @ResponseBody
   public Object userMessage(@RequestBody WxMessageRequest request) {
     return umsUserService.userMessage(request);
+  }
+
+  @ApiOperation("淘宝渠道搜索")
+  @PostMapping(value = "/tbRelation")
+  @ResponseBody
+  public CommonResult<Object> tbRelation() {
+    return CommonResult.success(tbService.getRelation(RequestHolder.getUid()));
   }
 }

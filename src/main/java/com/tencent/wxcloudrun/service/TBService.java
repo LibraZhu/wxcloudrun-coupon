@@ -66,17 +66,10 @@ public interface TBService extends IService<OmsOrder> {
   Object getUnionUrl(String id, String uid);
 
   /**
-   * 根据订单的会员id获取external_id(转链时候传递的uid)
+   * 渠道查询
    *
-   * @param specialId 会员id
+   * @param uid
    * @return
    */
-  String getUidBySpecialId(String specialId);
-  /**
-   * 根据external_id(转链时候传递的uid)获取订单的会员id
-   *
-   * @param uid 用户id
-   * @return
-   */
-  String getSpecialIdByUid(String uid);
+  String getRelation(String uid);
 }

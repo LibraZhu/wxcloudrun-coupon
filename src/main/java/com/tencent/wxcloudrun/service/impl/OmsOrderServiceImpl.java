@@ -1,11 +1,11 @@
 package com.tencent.wxcloudrun.service.impl;
 
 import cn.hutool.core.util.ObjectUtil;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.tencent.wxcloudrun.common.api.CommonPage;
+import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.dao.OmsOrderMapper;
 import com.tencent.wxcloudrun.dto.OrderDto;
 import com.tencent.wxcloudrun.dto.OrderQueryParam;
@@ -38,6 +38,7 @@ public class OmsOrderServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder>
   @Resource private TBService tbService;
   @Resource private DYService dyService;
   @Resource private WPHService wphService;
+  @Resource private UmsUserTbService umsUserTbService;
 
   @Value("${spring.profiles.active}")
   private String env;
@@ -62,26 +63,35 @@ public class OmsOrderServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder>
 
   @Override
   public CommonPage<OrderDto> list(OrderQueryParam queryParam) {
-    QueryWrapper<OmsOrder> queryWrapper = new QueryWrapper<>();
-    if (ObjectUtil.isNotEmpty(queryParam.getOrderId())) {
-      queryWrapper.eq("order_id", queryParam.getOrderId());
+
+    String uid = RequestHolder.getUid();
+    if (ObjectUtil.isEmpty(uid)) {
+      Asserts.fail("用户不存在");
     }
-    if (ObjectUtil.isNotEmpty(queryParam.getOrderTime())) {
-      queryWrapper.eq("order_time", queryParam.getOrderTime());
-    }
+    String rid =
+        umsUserTbService
+            .lambdaQuery()
+            .eq(UmsUserTb::getUid, uid)
+            .oneOpt()
+            .map(UmsUserTb::getRelationId)
+            .orElse(null);
+    LambdaQueryChainWrapper<OmsOrder> queryWrapper = lambdaQuery();
     if (ObjectUtil.isNotEmpty(queryParam.getOrderSource())) {
-      queryWrapper.eq("order_source", queryParam.getOrderSource());
+      queryWrapper.eq(OmsOrder::getOrderSource, queryParam.getOrderSource());
     }
     if (ObjectUtil.isNotEmpty(queryParam.getStatus())) {
-      queryWrapper.eq("status", queryParam.getStatus());
+      queryWrapper.eq(OmsOrder::getStatus, queryParam.getStatus());
+    } else {
+      queryWrapper.isNotNull(OmsOrder::getStatus);
     }
-    String uid = RequestHolder.getUid();
-    if (ObjectUtil.isNotEmpty(uid)) {
-      queryWrapper.eq("uid", uid);
+    if (ObjectUtil.isEmpty(rid)) {
+      queryWrapper.eq(OmsOrder::getUid, uid);
+    } else {
+      queryWrapper.and(wrapper -> wrapper.eq(OmsOrder::getUid, uid).or().eq(OmsOrder::getUid, rid));
     }
-    queryWrapper.orderByDesc("order_time");
-    IPage<OmsOrder> orderPage =
-        this.page(new Page<>(queryParam.getPage(), queryParam.getPageSize()), queryWrapper);
+    queryWrapper.orderByDesc(OmsOrder::getOrderTime);
+    Page<OmsOrder> orderPage =
+        queryWrapper.page(Page.of(queryParam.getPage(), queryParam.getPageSize()));
     return CommonPage.page(
         orderPage.getCurrent(),
         orderPage.getSize(),
