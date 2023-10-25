@@ -91,6 +91,8 @@ public class HJKTBLinkResponse extends HJKResponse {
     private Integer commissionRate;
     @JsonProperty("coupon_short_url")
     private String couponShortUrl;
+    @JsonProperty("coupon_amount")
+    private String couponAmount;
     @JsonProperty("ios_tbk_pwd")
     private String iosTbkPwd;
     @JsonProperty("tbk_pwd")

@@ -44,9 +44,9 @@ public class ClientConfig {
   }
 
   @Bean
-  @ConfigurationProperties(prefix = "hdk")
-  public HDKProperties hdkProperties() {
-    return new HDKProperties();
+  @ConfigurationProperties(prefix = "wyk")
+  public WYKProperties wykProperties() {
+    return new WYKProperties();
   }
 
   @Bean

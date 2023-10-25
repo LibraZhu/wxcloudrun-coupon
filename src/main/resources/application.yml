@@ -52,10 +52,9 @@ hjk:
   apiKey: 2ec2ffab04637dfc
   apiUrl: http://api-gw.haojingke.com/index.php/v1/api
 
-hdk:
-  apiKey: 59623DEAE2F1
-  apiUrl: http://v2.api.haodanku.com
-  apiV3Url: http://v3.api.haodanku.com
+wyk:
+  apiKey: V78630787H40005968
+  apiUrl: http://api.veapi.cn
 
 jtk:
   pubId: 133748

@@ -123,7 +123,7 @@ public class ProductServiceImpl implements ProductService {
     }
     if (ObjectUtil.equals(param.getSource(), ProductSource.TB.getCode())) {
       param.setIsTmall(true);
-      return tbService.searchProduct(param);
+      return tbService.listProduct(param);
     }
     if (ObjectUtil.equals(param.getSource(), ProductSource.WPH.getCode())) {
       return wpService.listProduct(param);

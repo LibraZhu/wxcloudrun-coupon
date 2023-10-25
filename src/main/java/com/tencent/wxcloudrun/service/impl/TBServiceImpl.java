@@ -7,15 +7,14 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.taobao.api.DefaultTaobaoClient;
-import com.taobao.api.request.TbkDgMaterialOptionalRequest;
 import com.taobao.api.request.TbkDgOptimusMaterialRequest;
-import com.taobao.api.response.TbkDgMaterialOptionalResponse;
 import com.taobao.api.response.TbkDgOptimusMaterialResponse;
 import com.tencent.wxcloudrun.common.api.CommonPage;
 import com.tencent.wxcloudrun.common.api.ResultCode;
 import com.tencent.wxcloudrun.common.exception.Asserts;
 import com.tencent.wxcloudrun.config.properties.HJKProperties;
 import com.tencent.wxcloudrun.config.properties.TBProperties;
+import com.tencent.wxcloudrun.config.properties.WYKProperties;
 import com.tencent.wxcloudrun.dao.OmsOrderMapper;
 import com.tencent.wxcloudrun.dto.*;
 import com.tencent.wxcloudrun.enums.OrderStatus;
@@ -57,6 +56,8 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
   @Resource private TBProperties tbProperties;
 
   @Resource private HJKProperties hjkProperties;
+
+  @Resource private WYKProperties wykProperties;
 
   @Resource private UmsUserTbService umsUserTbService;
 
@@ -343,11 +344,11 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
           "淘宝商品列表",
           JsonUtil.toJson(request),
           JsonUtil.toJson(response));
-      if (response.getResultList() != null) {
+      if (response.getResultList() != null && response.getResultList().size() > 0) {
         return CommonPage.page(
             param.getPage(),
             param.getPageSize(),
-            response.getTotalCount(),
+            Optional.ofNullable(response.getTotalCount()).orElse(500L),
             response.getResultList().stream()
                 .map(
                     (item) -> {
@@ -413,124 +414,97 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   @Override
   public CommonPage<HJKJDProduct> searchProduct(ProductQueryParam param) {
-    try {
-      TbkDgMaterialOptionalRequest request = new TbkDgMaterialOptionalRequest();
-      request.setPageNo(param.getPage());
-      request.setPageSize(param.getPageSize());
-      request.setPlatform(2L);
-      request.setIsTmall(param.getIsTmall());
-      if (ObjectUtil.isNotEmpty(param.getOptId())) {
-        switch (param.getOptId().intValue()) {
-          case 1:
-            request.setCat("35,50006004,50008165,50067081,5002925350024576");
-            break;
-          case 2:
-            request.setCat("21");
-            break;
-          case 3:
-            request.setCat("50002766");
-            break;
-          case 4:
-            request.setCat("16");
-            break;
-          case 5:
-            request.setCat("1801,50026391");
-            break;
-          case 6:
-            request.setCat("50006842,50006843,50010388,50011740,50016853,");
-            break;
-          case 7:
-            request.setCat("30");
-            break;
-          case 8:
-            request.setCat("14");
-            break;
-          default:
-            request.setCat("50005998,21");
-            break;
-        }
-      }
-      if (param.getSortType() == 6) {
-        request.setSort("total_sales_des");
-      } else if (param.getSortType() == 9) {
-        request.setSort("price_asc");
-      }
-      request.setQ(param.getKeyword());
-      request.setAdzoneId(tbProperties.getPid());
-      request.setPageResultKey(param.getListId());
-      TbkDgMaterialOptionalResponse response = getTBClient().execute(request);
-      XLogger.log(
-          logger,
-          env,
-          "[{}],Request:{},Response:{}",
-          "淘宝商品搜索",
-          JsonUtil.toJson(request),
-          JsonUtil.toJson(response));
-      if (response.getResultList() != null) {
-        return CommonPage.page(
-            param.getPage(),
-            param.getPageSize(),
-            response.getTotalResults(),
-            response.getResultList().stream()
-                .map(
-                    (item) -> {
-                      HJKJDProduct product = new HJKJDProduct();
-                      product.setGoods_id(item.getItemId());
-                      product.setGoods_name(item.getTitle());
-                      product.setGoods_desc(item.getItemDescription());
-                      product.setPrice(item.getZkFinalPrice());
-                      product.setDiscount(item.getCouponAmount());
-                      if (ObjectUtil.isNotNull(item.getCouponAmount())) {
-                        product.setPrice_after(
-                            new BigDecimal(item.getZkFinalPrice())
-                                .subtract(new BigDecimal(item.getCouponAmount()))
-                                .toString());
+    String api = wykProperties.getApiUrl() + "/tbk/tb_search";
+    MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+    map.add("vekey", wykProperties.getApiKey());
+    map.add("page", param.getPage());
+    map.add("pagesize", param.getPageSize());
+    map.add("cat", param.getOptId());
+    map.add("para", param.getKeyword());
+    if (param.getIsTmall() != null) {
+      map.add("is_tmall", param.getIsTmall());
+    }
+    if (param.getSortType() == 6) {
+      map.add("sort", "total_sales_des");
+    } else if (param.getSortType() == 9) {
+      map.add("sort", "price_asc");
+    }
+    HttpHeaders httpHeaders = new HttpHeaders();
+    httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(map, httpHeaders);
+
+    TBProductListResponse response =
+        RestTemplateUtil.getInstance().postForObject(api, request, TBProductListResponse.class);
+    XLogger.log(
+        logger,
+        env,
+        "[{}],Request:{},Response:{}",
+        "淘宝商品搜索",
+        JsonUtil.toJson(map),
+        JsonUtil.toJson(response));
+    if (response != null
+        && response.getResultList() != null
+        && response.getResultList().size() > 0) {
+      return CommonPage.page(
+          param.getPage(),
+          param.getPageSize(),
+          response.getTotalResults().longValue(),
+          response.getResultList().stream()
+              .map(
+                  (item) -> {
+                    HJKJDProduct product = new HJKJDProduct();
+                    product.setGoods_id(item.getItemId());
+                    product.setGoods_name(item.getTitle());
+                    product.setGoods_desc(item.getItemDescription());
+                    product.setPrice(item.getZkFinalPrice());
+                    product.setDiscount(item.getCouponAmount());
+                    if (ObjectUtil.isNotNull(item.getCouponAmount())) {
+                      product.setPrice_after(
+                          new BigDecimal(item.getZkFinalPrice())
+                              .subtract(new BigDecimal(item.getCouponAmount()))
+                              .toString());
+                    } else {
+                      product.setPrice_after(item.getZkFinalPrice());
+                    }
+                    BigDecimal commission =
+                        new BigDecimal(product.getPrice_after())
+                            .multiply(new BigDecimal(item.getCommissionRate()))
+                            .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
+                    product.setRebate(getRebate(commission));
+                    if (StrUtil.equals(env, "dev")) {
+                      product.setCommissionshare(
+                          new BigDecimal(item.getCommissionRate())
+                              .divide(new BigDecimal("100"), 1, RoundingMode.DOWN)
+                              .toString());
+                      product.setCommission(commission.stripTrailingZeros().toPlainString());
+                    }
+                    product.setPicurl(item.getPictUrl());
+                    if (ObjectUtil.isEmpty(item.getSmallImages())) {
+                      product.setPicurls(item.getPictUrl());
+                    } else {
+                      product.setPicurls(String.join(",", item.getSmallImages()));
+                    }
+                    try {
+                      if (Long.parseLong(item.getTkTotalSales()) >= 10000) {
+                        product.setSalesTip(
+                            String.format(
+                                "月售%s万+件",
+                                new BigDecimal(item.getTkTotalSales())
+                                    .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
+                                    .stripTrailingZeros()
+                                    .toPlainString()));
                       } else {
-                        product.setPrice_after(item.getZkFinalPrice());
-                      }
-                      BigDecimal commission =
-                          new BigDecimal(product.getPrice_after())
-                              .multiply(new BigDecimal(item.getCommissionRate()))
-                              .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
-                      product.setRebate(getRebate(commission));
-                      if (StrUtil.equals(env, "dev")) {
-                        product.setCommissionshare(
-                            new BigDecimal(item.getCommissionRate())
-                                .divide(new BigDecimal("100"), 1, RoundingMode.DOWN)
-                                .toString());
-                        product.setCommission(commission.stripTrailingZeros().toPlainString());
-                      }
-                      product.setPicurl(item.getPictUrl());
-                      if (ObjectUtil.isEmpty(item.getSmallImages())) {
-                        product.setPicurls(item.getPictUrl());
-                      } else {
-                        product.setPicurls(String.join(",", item.getSmallImages()));
-                      }
-                      try {
-                        if (Long.parseLong(item.getTkTotalSales()) >= 10000) {
-                          product.setSalesTip(
-                              String.format(
-                                  "月售%s万+件",
-                                  new BigDecimal(item.getTkTotalSales())
-                                      .divide(new BigDecimal("10000"), 1, RoundingMode.DOWN)
-                                      .stripTrailingZeros()
-                                      .toPlainString()));
-                        } else {
-                          product.setSalesTip(String.format("月售%s件", item.getTkTotalSales()));
-                        }
-                      } catch (Exception e) {
                         product.setSalesTip(String.format("月售%s件", item.getTkTotalSales()));
                       }
-                      product.setIs_tmall(ObjectUtil.equals(item.getUserType(), 1L));
-                      product.setSource(ProductSource.TB.getCode());
-                      return product;
-                    })
-                .collect(Collectors.toList()),
-            response.getPageResultKey());
-      }
-    } catch (Exception e) {
-      e.printStackTrace();
-      Asserts.fail(e.getLocalizedMessage());
+                    } catch (Exception e) {
+                      product.setSalesTip(String.format("月售%s件", item.getTkTotalSales()));
+                    }
+                    product.setIs_tmall(ObjectUtil.equals(item.getUserType(), 1L));
+                    product.setSource(ProductSource.TB.getCode());
+                    return product;
+                  })
+              .collect(Collectors.toList()),
+          null);
     }
     return CommonPage.page(param.getPage(), param.getPageSize(), 0L, null);
   }
@@ -560,17 +534,20 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
       HJKJDProduct product = new HJKJDProduct();
       product.setGoods_id(item.getItemId());
       product.setGoods_name(item.getTitle());
+      product.setPrice(item.getZkFinalPrice());
+      product.setDiscount(item.getCouponAmount());
+      if (ObjectUtil.isNotNull(item.getCouponAmount())) {
+        product.setPrice_after(
+            new BigDecimal(item.getZkFinalPrice())
+                .subtract(new BigDecimal(item.getCouponAmount()))
+                .toString());
+      } else {
+        product.setPrice_after(item.getZkFinalPrice());
+      }
       BigDecimal commission =
-          new BigDecimal(item.getZkFinalPrice())
+          new BigDecimal(product.getPrice_after())
               .multiply(new BigDecimal(item.getCommissionRate()))
               .divide(new BigDecimal(10000), 2, RoundingMode.DOWN); // 返佣
-      product.setPrice(item.getReservePrice());
-      product.setPrice_after(item.getZkFinalPrice());
-      product.setDiscount(
-          new BigDecimal(item.getReservePrice())
-              .subtract(new BigDecimal(item.getZkFinalPrice()))
-              .stripTrailingZeros()
-              .toPlainString());
       product.setRebate(getRebate(commission));
       if (StrUtil.equals(env, "dev")) {
         product.setCommissionshare(
@@ -644,16 +621,16 @@ public class TBServiceImpl extends ServiceImpl<OmsOrderMapper, OmsOrder> impleme
 
   @Override
   public String getRelation(String uid) {
-    String api = "http://api.veapi.cn/tbk/publisherget";
-      MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
-      map.add("vekey", "V78630787H40005968");
-      map.add("page_no", 0);
-      map.add("page_size", 100000);
-      HttpHeaders httpHeaders = new HttpHeaders();
-      httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-      HttpEntity<MultiValueMap<String, Object>> param = new HttpEntity<>(map, httpHeaders);
+    String api = wykProperties.getApiUrl() + "/tbk/publisherget";
+    MultiValueMap<String, Object> map = new LinkedMultiValueMap<>();
+    map.add("vekey", wykProperties.getApiKey());
+    map.add("page_no", 0);
+    map.add("page_size", 100000);
+    HttpHeaders httpHeaders = new HttpHeaders();
+    httpHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+    HttpEntity<MultiValueMap<String, Object>> param = new HttpEntity<>(map, httpHeaders);
 
-      TBRelationResponse response =
+    TBRelationResponse response =
         RestTemplateUtil.getInstance().postForObject(api, param, TBRelationResponse.class);
     XLogger.log(
         logger,

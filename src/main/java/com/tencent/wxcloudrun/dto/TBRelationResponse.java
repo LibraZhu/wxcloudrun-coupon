@@ -8,9 +8,8 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = true)
 @Data
-public class TBRelationResponse extends HJKResponse {
+public class TBRelationResponse {
 
   @JsonProperty("error")
   private String error;
